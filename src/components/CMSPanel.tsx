@@ -17,7 +17,8 @@ interface CMSPanelProps {
 const APPROVED_CMS_USERS = [
   "fsudmcdcl@gmail.com", // Main user email
   "amitjoc@gmail.com",
-  "fsudmc.edu.np@gmail.com"
+  "fsudmc.edu.np@gmail.com",
+  "admin@admin.com"
 ];
 
 type CMSTab = "general" | "slides" | "news" | "team" | "downloads" | "blogs" | "popup";

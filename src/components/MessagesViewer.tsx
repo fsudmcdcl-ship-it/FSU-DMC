@@ -14,7 +14,8 @@ interface MessagesViewerProps {
 const AUTHORIZED_EMAILS = [
   "fsudmcdcl@gmail.com", // User's email from metadata
   "amitjoc@gmail.com",
-  "fsudmc.edu.np@gmail.com"
+  "fsudmc.edu.np@gmail.com",
+  "admin@admin.com"
 ];
 
 export default function MessagesViewer({ lang, onGoHome }: MessagesViewerProps) {
