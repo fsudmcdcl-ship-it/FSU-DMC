@@ -1,0 +1,38 @@
+{
+  "rules": {
+    "generalSettings": {
+      ".read": "true",
+      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+    },
+    "importantNotice": {
+      ".read": "true",
+      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+    },
+    "slides": {
+      ".read": "true",
+      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+    },
+    "news": {
+      ".read": "true",
+      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+    },
+    "downloads": {
+      ".read": "true",
+      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+    },
+    "blogs": {
+      ".read": "true",
+      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+    },
+    "team": {
+      ".read": "true",
+      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+    },
+    "contacts": {
+      ".read": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')",
+      "$contact_id": {
+        ".write": "(!data.exists() && newData.exists()) || (auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com'))"
+      }
+    }
+  }
+}
