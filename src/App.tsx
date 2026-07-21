@@ -110,25 +110,47 @@ export default function App() {
 
   // Sync DB and Seed if empty
   useEffect(() => {
-    const rootRef = ref(rtdb);
-
     const checkAndSeed = async () => {
       await seedInitialDataIfEmpty();
     };
     checkAndSeed();
 
-    const unsubscribe = onValue(rootRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setDbState(data as DatabaseState);
-      }
-      setLoading(false);
-    }, (err) => {
-      console.error("Database read rejected or failed: ", err);
-      setLoading(false);
+    const publicKeys: (keyof DatabaseState)[] = [
+      "generalSettings",
+      "importantNotice",
+      "slides",
+      "news",
+      "downloads",
+      "blogs",
+      "team"
+    ];
+
+    let loadedCount = 0;
+    const unsubscribes = publicKeys.map((key) => {
+      const nodeRef = ref(rtdb, key);
+      return onValue(nodeRef, (snapshot) => {
+        const val = snapshot.val();
+        setDbState((prev) => ({
+          ...prev,
+          [key]: val || DEFAULT_DB_STATE[key]
+        }));
+        
+        loadedCount++;
+        if (loadedCount >= publicKeys.length) {
+          setLoading(false);
+        }
+      }, (err) => {
+        console.error(`Failed to read node ${key}: `, err);
+        loadedCount++;
+        if (loadedCount >= publicKeys.length) {
+          setLoading(false);
+        }
+      });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+    };
   }, []);
 
   // Scroll Spy to highlight active section on nav tab

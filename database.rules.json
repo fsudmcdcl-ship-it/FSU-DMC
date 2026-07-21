@@ -2,36 +2,36 @@
   "rules": {
     "generalSettings": {
       ".read": "true",
-      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+      ".write": "auth != null"
     },
     "importantNotice": {
       ".read": "true",
-      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+      ".write": "auth != null"
     },
     "slides": {
       ".read": "true",
-      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+      ".write": "auth != null"
     },
     "news": {
       ".read": "true",
-      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+      ".write": "auth != null"
     },
     "downloads": {
       ".read": "true",
-      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+      ".write": "auth != null"
     },
     "blogs": {
       ".read": "true",
-      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+      ".write": "auth != null"
     },
     "team": {
       ".read": "true",
-      ".write": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')"
+      ".write": "auth != null"
     },
     "contacts": {
-      ".read": "auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com')",
+      ".read": "auth != null",
       "$contact_id": {
-        ".write": "(!data.exists() && newData.exists()) || (auth != null && (auth.token.email === 'fsudmcdcl@gmail.com' || auth.token.email === 'amitjoc@gmail.com' || auth.token.email === 'fsudmc.edu.np@gmail.com'))"
+        ".write": "!data.exists() && newData.exists()"
       }
     }
   }

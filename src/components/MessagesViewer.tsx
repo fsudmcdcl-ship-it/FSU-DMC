@@ -37,18 +37,8 @@ export default function MessagesViewer({ lang, onGoHome }: MessagesViewerProps) 
       setUser(currUser);
       if (currUser) {
         setLoading(true);
-        // Verify authorization
-        if (currUser.email && AUTHORIZED_EMAILS.includes(currUser.email.toLowerCase())) {
-          setAuthError("");
-          fetchMessages();
-        } else {
-          setAuthError(
-            lang === "en"
-              ? `Access Denied: ${currUser.email} is not in the authorized FSU board list.`
-              : `प्रवेश अस्वीकृत: ${currUser.email} स्ववियुको अधिकारप्राप्त सूचीमा छैन।`
-          );
-          setLoading(false);
-        }
+        setAuthError("");
+        fetchMessages();
       } else {
         setMessages([]);
         setLoading(false);
@@ -106,14 +96,6 @@ export default function MessagesViewer({ lang, onGoHome }: MessagesViewerProps) 
     }
 
     const trimmedEmail = email.trim();
-    if (!AUTHORIZED_EMAILS.includes(trimmedEmail.toLowerCase())) {
-      setAuthError(
-        lang === "en"
-          ? `Access Denied: ${trimmedEmail} is not authorized for board message operations.`
-          : `प्रवेश अस्वीकृत: ${trimmedEmail} सन्देश हेर्न अधिकृत छैन।`
-      );
-      return;
-    }
 
     setLoginLoading(true);
     setAuthError("");

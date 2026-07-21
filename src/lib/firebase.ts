@@ -11,8 +11,7 @@ const firebaseConfig = {
   messagingSenderId: "214528113668",
   appId: "1:214528113668:web:dfc4abf7d3736c8d454951",
   measurementId: "G-F49VKLZ071",
-  // Construct default Realtime Database URL
-  databaseURL: "https://fsu-bdbf6-default-rtdb.firebaseio.com"
+  databaseURL: "https://fsu-bdbf6-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
 // Initialize Firebase

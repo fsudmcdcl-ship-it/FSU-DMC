@@ -59,11 +59,7 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
     const unsubscribe = auth.onAuthStateChanged((currUser) => {
       setUser(currUser);
       if (currUser) {
-        if (currUser.email && APPROVED_CMS_USERS.includes(currUser.email.toLowerCase())) {
-          setAuthError("");
-        } else {
-          setAuthError(`Access Denied: ${currUser.email} is not authorized to edit FSU content.`);
-        }
+        setAuthError("");
       }
     });
     return () => unsubscribe();
@@ -96,10 +92,6 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
     }
 
     const trimmedEmail = email.trim();
-    if (!APPROVED_CMS_USERS.includes(trimmedEmail.toLowerCase())) {
-      setAuthError(`Access Denied: ${trimmedEmail} is not authorized for CMS board operations.`);
-      return;
-    }
 
     setLoginLoading(true);
     setAuthError("");
