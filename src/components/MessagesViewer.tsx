@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { ref, onValue, remove, child } from "firebase/database";
-import { signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { rtdb, auth } from "../lib/firebase";
 import { ContactSubmission } from "../types";
-import { Lock, MailOpen, Trash2, ShieldCheck, LogOut, Loader2, Calendar, User, EyeOff } from "lucide-react";
+import { Lock, MailOpen, Trash2, ShieldCheck, LogOut, Loader2, Calendar, User, Eye, EyeOff, Mail } from "lucide-react";
 
 interface MessagesViewerProps {
   lang: "en" | "np";
@@ -23,6 +23,12 @@ export default function MessagesViewer({ lang, onGoHome }: MessagesViewerProps) 
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+
+  // Email and Password Login/Register States
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Monitor auth state changes
   useEffect(() => {
@@ -91,6 +97,51 @@ export default function MessagesViewer({ lang, onGoHome }: MessagesViewerProps) 
     }
   };
 
+  const handleEmailPasswordAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setAuthError(lang === "en" ? "Please fill in both email and password." : "कृपया इमेल र पासवर्ड दुवै भर्नुहोस्।");
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    if (!AUTHORIZED_EMAILS.includes(trimmedEmail.toLowerCase())) {
+      setAuthError(
+        lang === "en"
+          ? `Access Denied: ${trimmedEmail} is not authorized for board message operations.`
+          : `प्रवेश अस्वीकृत: ${trimmedEmail} सन्देश हेर्न अधिकृत छैन।`
+      );
+      return;
+    }
+
+    setLoginLoading(true);
+    setAuthError("");
+    try {
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+      } else {
+        await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      }
+    } catch (err: any) {
+      console.error("Firebase Auth Error:", err);
+      let errMsg = lang === "en" ? "Failed to authenticate." : "लगइन गर्न असफल भयो।";
+      if (err.code === "auth/user-not-found") {
+        errMsg = lang === "en" ? "Admin account not found. Click Register below to create one." : "खाता भेटिएन। नयाँ खाता दर्ता गर्न तलको विकल्प रोज्नुहोस्।";
+      } else if (err.code === "auth/wrong-password") {
+        errMsg = lang === "en" ? "Incorrect password. Please try again." : "गलत पासवर्ड। कृपया पुनः प्रयास गर्नुहोस्।";
+      } else if (err.code === "auth/weak-password") {
+        errMsg = lang === "en" ? "Password must be at least 6 characters long." : "पासवर्ड कम्तीमा ६ अक्षरको हुनुपर्छ।";
+      } else if (err.code === "auth/email-already-in-use") {
+        errMsg = lang === "en" ? "Email already registered. Try signing in." : "यो इमेल पहिले नै दर्ता भइसकेको छ।";
+      } else if (err.message) {
+        errMsg = err.message;
+      }
+      setAuthError(errMsg);
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   const handleDeleteMessage = async (msgId: string) => {
     if (!window.confirm(lang === "en" ? "Delete this submission permanently?" : "के यो सन्देश सधैंको लागि मेटाउन चाहनुहुन्छ?")) {
       return;
@@ -105,45 +156,133 @@ export default function MessagesViewer({ lang, onGoHome }: MessagesViewerProps) 
   // Login Gate
   if (!user || authError) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center p-4 bg-slate-50">
-        <div className="bg-white border border-slate-200 p-8 rounded-3xl max-w-md w-full shadow-xl text-center flex flex-col items-center">
-          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-6 border border-red-100 shadow-inner">
+      <div className="min-h-[85vh] flex items-center justify-center p-4 bg-slate-50">
+        <div className="bg-white border border-slate-200 p-8 rounded-3xl max-w-md w-full shadow-xl flex flex-col items-center">
+          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-4 border border-red-100 shadow-inner">
             <Lock className="w-8 h-8" />
           </div>
 
-          <h3 className="text-xl font-bold text-gray-900 mb-2">
+          <h3 className="text-xl font-extrabold text-gray-900 mb-2 text-center">
             {lang === "en" ? "Restricted FSU Inbox" : "गोप्य सन्देश बक्स"}
           </h3>
-          <p className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-4">
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-wider mb-5">
             fsudmc.edu.np/databasemessage2083
           </p>
-          <p className="text-sm text-gray-600 mb-8">
+          <p className="text-xs text-gray-500 mb-6 text-center leading-relaxed">
             {lang === "en"
-              ? "Access to this page is strictly restricted to FSU Darchula Multiple Campus board officials. Please sign in with your authorized Gmail."
-              : "यो पाना स्ववियु दार्चुला बहुमुखी क्याम्पसका आधिकारिक पदाधिकारीहरूको लागि मात्र आरक्षित छ। कृपया आधिकारिक इमेल प्रयोग गरी लगइन गर्नुहोस्।"}
+              ? "Access to this page is strictly restricted to FSU Darchula Multiple Campus board officials. Please sign in with your authorized administrator credentials."
+              : "यो पाना स्ववियु दार्चुला बहुमुखी क्याम्पसका आधिकारिक पदाधिकारीहरूको लागि मात्र आरक्षित छ। कृपया आफ्नो आधिकारिक प्रमाणहरू प्रयोग गरी लगइन गर्नुहोस्।"}
           </p>
 
           {authError && (
-            <div className="w-full p-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-xs font-semibold mb-6">
+            <div className="w-full p-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-xs font-semibold mb-5 text-left">
               {authError}
             </div>
           )}
+
+          {/* Email and Password Form */}
+          <form onSubmit={handleEmailPasswordAuth} className="w-full space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                {lang === "en" ? "Admin Email Address" : "प्रशासक इमेल ठेगाना"}
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                {lang === "en" ? "Admin Password" : "प्रशासक पासवर्ड"}
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-100 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {loginLoading ? (
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              ) : (
+                <ShieldCheck className="w-4 h-4" />
+              )}
+              <span>
+                {isRegistering
+                  ? (lang === "en" ? "Create & Register Admin" : "नयाँ प्रशासक खाता दर्ता गर्नुहोस्")
+                  : (lang === "en" ? "Log In with Credentials" : "विवरण सहित लगइन गर्नुहोस्")}
+              </span>
+            </button>
+          </form>
+
+          {/* Registration Mode Switcher */}
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegistering(!isRegistering);
+                setAuthError("");
+              }}
+              className="text-xs text-emerald-600 hover:text-emerald-700 font-bold transition underline"
+            >
+              {isRegistering
+                ? (lang === "en" ? "Already have an admin password? Sign In" : "पहिल्यै खाता छ? यहाँ लगइन गर्नुहोस्")
+                : (lang === "en" ? "First time? Register your Admin Email Password" : "पहिलो पटक हो? प्रशासक खाता दर्ता गर्नुहोस्")}
+            </button>
+          </div>
+
+          {/* Separator */}
+          <div className="w-full flex items-center my-6">
+            <div className="flex-1 border-t border-slate-200"></div>
+            <span className="px-3 text-xs text-gray-400 font-medium">{lang === "en" ? "OR" : "अथवा"}</span>
+            <div className="flex-1 border-t border-slate-200"></div>
+          </div>
 
           <div className="w-full flex flex-col gap-3">
             {loginLoading ? (
               <button
                 disabled
-                className="w-full py-3 bg-emerald-600/50 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-slate-900/50 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2"
               >
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Authorizing...</span>
+                <span>{lang === "en" ? "Authorizing..." : "लगइन हुँदैछ..."}</span>
               </button>
             ) : (
               <button
                 onClick={handleLogin}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-emerald-50 transition flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
               >
-                <ShieldCheck className="w-4 h-4" />
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span>{lang === "en" ? "Sign In with Google" : "गुगल खाता मार्फत लगइन"}</span>
               </button>
             )}
@@ -153,13 +292,13 @@ export default function MessagesViewer({ lang, onGoHome }: MessagesViewerProps) 
                 onClick={handleSignOut}
                 className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
               >
-                {lang === "en" ? "Sign Out Current Account" : "लगआउट गर्नुहोस्"}
+                {lang === "en" ? `Sign Out Session (${user.email})` : `लगआउट गर्नुहोस् (${user.email})`}
               </button>
             )}
 
             <button
               onClick={onGoHome}
-              className="w-full py-2 text-slate-500 hover:text-slate-900 text-xs font-semibold transition mt-2"
+              className="w-full py-2 text-slate-500 hover:text-slate-900 text-xs font-bold transition mt-2"
             >
               {lang === "en" ? "← Back to Public Website" : "← सार्वजनिक वेबसाइटमा फर्कनुहोस्"}
             </button>

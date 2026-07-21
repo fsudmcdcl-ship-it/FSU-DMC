@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { GeneralSettings } from "../types";
-import { Shield, BookOpen, ExternalLink, HelpCircle } from "lucide-react";
+import { Shield, BookOpen, ExternalLink, HelpCircle, Lock } from "lucide-react";
 
 interface FooterProps {
   settings: GeneralSettings;
@@ -64,7 +64,7 @@ export default function Footer({ settings, lang }: FooterProps) {
         {/* Column 3: Policy & Legal Toggles */}
         <div>
           <h3 className="text-lg font-bold text-white mb-4 border-b border-gray-800 pb-2">
-            {lang === "en" ? "Terms & Privacy" : "नीति तथा सर्तहरू"}
+            {lang === "en" ? "Administration & Legal" : "प्रशासनिक तथा नीतिहरू"}
           </h3>
           <div className="flex flex-col gap-3">
             <button
@@ -81,6 +81,13 @@ export default function Footer({ settings, lang }: FooterProps) {
               <BookOpen className="w-4 h-4 text-amber-500" />
               <span>{lang === "en" ? "Terms & Conditions" : "सर्त तथा बन्देजहरू"}</span>
             </button>
+            <a
+              href="#fsudmclogin"
+              className="text-left text-sm text-gray-400 hover:text-amber-400 transition flex items-center gap-2 cursor-pointer font-medium mt-1"
+            >
+              <Lock className="w-4 h-4 text-amber-500" />
+              <span>{lang === "en" ? "Admin Login Portal" : "प्रशासकीय लगइन पोर्टल"}</span>
+            </a>
           </div>
           {/* Settings and links customizable info removed */}
         </div>

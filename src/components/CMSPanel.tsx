@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { ref, update, set, remove, push, onValue } from "firebase/database";
-import { signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { rtdb, auth } from "../lib/firebase";
 import { DatabaseState, GeneralSettings, SlideItem, NewsItem, TeamMember, DownloadItem, BlogItem, ImportantNotice } from "../types";
 import {
-  Lock, ShieldAlert, Edit, Trash2, Plus, Save, Settings, Sliders, FileText, Users, Download, PenTool, AlertOctagon, LogOut, CheckCircle, Upload, Inbox
+  Lock, ShieldAlert, Edit, Trash2, Plus, Save, Settings, Sliders, FileText, Users, Download, PenTool, AlertOctagon, LogOut, CheckCircle, Upload, Inbox, Mail, Eye, EyeOff
 } from "lucide-react";
 
 interface CMSPanelProps {
@@ -28,6 +28,13 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
   const [authError, setAuthError] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Email and Password Login/Register States
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   // Form states
   const [genSettingsForm, setGenSettingsForm] = useState<GeneralSettings>(state?.generalSettings || {} as GeneralSettings);
@@ -78,6 +85,49 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
 
   const handleSignOut = async () => {
     await signOut(auth);
+  };
+
+  const handleEmailPasswordAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setAuthError("Please enter both email and password.");
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    if (!APPROVED_CMS_USERS.includes(trimmedEmail.toLowerCase())) {
+      setAuthError(`Access Denied: ${trimmedEmail} is not authorized for CMS board operations.`);
+      return;
+    }
+
+    setLoginLoading(true);
+    setAuthError("");
+    try {
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        showToast("Administrator account successfully created and logged in!");
+      } else {
+        await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        showToast("Successfully signed in to admin portal!");
+      }
+    } catch (err: any) {
+      console.error("Firebase Auth Error:", err);
+      let errMsg = "Failed to authenticate. Please check your credentials.";
+      if (err.code === "auth/user-not-found") {
+        errMsg = "Admin user not found. If this is your first time logging in, toggle 'Register Admin Account' below.";
+      } else if (err.code === "auth/wrong-password") {
+        errMsg = "Incorrect password. Please verify your credentials.";
+      } else if (err.code === "auth/weak-password") {
+        errMsg = "Password must be at least 6 characters long.";
+      } else if (err.code === "auth/email-already-in-use") {
+        errMsg = "An account with this email is already registered. Try logging in instead.";
+      } else if (err.message) {
+        errMsg = err.message;
+      }
+      setAuthError(errMsg);
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
   const showToast = (txt: string) => {
@@ -199,36 +249,119 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
   // Login Screen Gate
   if (!user || authError) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center p-4 bg-slate-100">
-        <div className="bg-white p-8 rounded-3xl max-w-md w-full shadow-xl border border-slate-200 text-center flex flex-col items-center">
-          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-6 border border-emerald-100 shadow-inner">
+      <div className="min-h-[85vh] flex items-center justify-center p-4 bg-slate-50">
+        <div className="bg-white p-8 rounded-3xl max-w-md w-full shadow-xl border border-slate-200 flex flex-col items-center">
+          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4 border border-emerald-100 shadow-inner">
             <Lock className="w-8 h-8" />
           </div>
 
-          <h3 className="text-xl font-bold text-gray-900 mb-1">
+          <h3 className="text-xl font-extrabold text-gray-900 mb-1">
             FSU CMS Control Center
           </h3>
-          <p className="text-xs text-gray-400 font-mono tracking-wider uppercase mb-4">
+          <p className="text-xs text-slate-400 font-mono tracking-wider uppercase mb-5">
             fsudmc.edu.np/fsudmclogin
           </p>
-          <p className="text-sm text-gray-600 mb-8">
-            Please log in with an authorized administrator Gmail account to modify the website contents, upload slides, manage name cards, edit syllabus files, or view messages.
+
+          <p className="text-xs text-gray-500 mb-6 text-center leading-relaxed">
+            Please log in with your authorized administrator Firebase credentials to manage homepage contents, banners, news tickers, downloads, and committee lists.
           </p>
 
           {authError && (
-            <div className="w-full p-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-xs font-semibold mb-6 flex items-center gap-2 text-left">
-              <ShieldAlert className="w-5 h-5 text-red-600 shrink-0" />
+            <div className="w-full p-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-xs font-semibold mb-5 flex items-start gap-2 text-left">
+              <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <span>{authError}</span>
             </div>
           )}
 
+          {/* Email and Password Form */}
+          <form onSubmit={handleEmailPasswordAuth} className="w-full space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                Authorized Admin Email
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                Admin Password
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-100 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {loginLoading ? (
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              <span>{isRegistering ? "Create & Register Admin" : "Log In with Credentials"}</span>
+            </button>
+          </form>
+
+          {/* Registration Mode Switcher */}
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegistering(!isRegistering);
+                setAuthError("");
+              }}
+              className="text-xs text-emerald-600 hover:text-emerald-700 font-bold transition underline"
+            >
+              {isRegistering ? "Already have an admin password? Sign In" : "First time? Register your Admin Email Password"}
+            </button>
+          </div>
+
+          {/* Separator */}
+          <div className="w-full flex items-center my-6">
+            <div className="flex-1 border-t border-slate-200"></div>
+            <span className="px-3 text-xs text-gray-400 font-medium">OR FALLBACK</span>
+            <div className="flex-1 border-t border-slate-200"></div>
+          </div>
+
           <div className="w-full space-y-3">
             <button
               onClick={handleLogin}
-              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Save className="w-4 h-4" />
-              <span>Log In with Google Admin</span>
+              <Users className="w-4 h-4" />
+              <span>Sign In with Google Auth</span>
             </button>
 
             {user && (
@@ -236,15 +369,15 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
                 onClick={handleSignOut}
                 className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
               >
-                Sign Out Current Account
+                Sign Out Current Session ({user.email})
               </button>
             )}
 
             <button
               onClick={onGoHome}
-              className="w-full py-2 text-gray-500 hover:text-gray-800 text-xs font-semibold transition mt-2"
+              className="w-full py-2 text-gray-500 hover:text-gray-800 text-xs font-bold transition mt-2 flex items-center justify-center gap-1"
             >
-              ← Back to Main Page
+              ← Back to Main Public Page
             </button>
           </div>
         </div>
