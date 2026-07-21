@@ -48,9 +48,9 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const pageParam = params.get("page");
 
-      if (path === "/fsudmclogin" || hash === "#fsudmclogin" || pageParam === "fsudmclogin") {
+      if (path.endsWith("/fsudmclogin") || hash === "#fsudmclogin" || pageParam === "fsudmclogin") {
         setRoute("cms");
-      } else if (path === "/databasemessage2083" || hash === "#messages" || pageParam === "messages") {
+      } else if (path.endsWith("/databasemessage2083") || hash === "#messages" || pageParam === "messages") {
         setRoute("messages");
       } else {
         setRoute("home");
@@ -67,23 +67,40 @@ export default function App() {
     };
   }, []);
 
-  // Update navigation history pathname dynamically
+  // Update navigation history pathname dynamically (subdirectory-safe for GitHub Pages)
   const navigateTo = (targetRoute: RouteState) => {
     setRoute(targetRoute);
     const newUrl = new URL(window.location.href);
     
-    // Clean query params
+    // Clean query params and hash
     newUrl.searchParams.delete("page");
+    newUrl.hash = "";
+
+    // Extract any repository subdirectory prefix (e.g., /repository-name) from current path
+    const currentPath = window.location.pathname;
+    let repoPrefix = "";
+    
+    if (currentPath.toLowerCase().endsWith("/fsudmclogin")) {
+      repoPrefix = currentPath.substring(0, currentPath.length - "/fsudmclogin".length);
+    } else if (currentPath.toLowerCase().endsWith("/databasemessage2083")) {
+      repoPrefix = currentPath.substring(0, currentPath.length - "/databasemessage2083".length);
+    } else {
+      repoPrefix = currentPath;
+    }
+    
+    // Clean trailing slash of prefix
+    if (repoPrefix.endsWith("/")) {
+      repoPrefix = repoPrefix.slice(0, -1);
+    }
 
     if (targetRoute === "cms") {
-      newUrl.pathname = "/fsudmclogin";
+      newUrl.pathname = repoPrefix + "/fsudmclogin";
       window.history.pushState({}, "", newUrl.toString());
     } else if (targetRoute === "messages") {
-      newUrl.pathname = "/databasemessage2083";
+      newUrl.pathname = repoPrefix + "/databasemessage2083";
       window.history.pushState({}, "", newUrl.toString());
     } else {
-      newUrl.pathname = "/";
-      newUrl.hash = "";
+      newUrl.pathname = repoPrefix + "/";
       window.history.pushState({}, "", newUrl.toString());
     }
   };
