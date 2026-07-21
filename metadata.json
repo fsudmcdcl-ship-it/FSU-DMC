@@ -1,0 +1,6 @@
+{
+  "name": "Free Student Union - Darchula Multiple Campus",
+  "description": "Website for Free Students Union (FSU) of Darchula Multiple Campus (DMC) with dynamic CMS management, news, downloads, student blogs, FSU team, message boards, and secure contact forms.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
