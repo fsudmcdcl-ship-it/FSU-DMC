@@ -48,7 +48,7 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const pageParam = params.get("page");
 
-      if (path.endsWith("/fsudmclogin") || hash === "#fsudmclogin" || pageParam === "fsudmclogin") {
+      if (path.endsWith("/campuslogin") || hash === "#campuslogin" || pageParam === "campuslogin") {
         setRoute("cms");
       } else if (path.endsWith("/databasemessage2083") || hash === "#messages" || pageParam === "messages") {
         setRoute("messages");
@@ -80,8 +80,8 @@ export default function App() {
     const currentPath = window.location.pathname;
     let repoPrefix = "";
     
-    if (currentPath.toLowerCase().endsWith("/fsudmclogin")) {
-      repoPrefix = currentPath.substring(0, currentPath.length - "/fsudmclogin".length);
+    if (currentPath.toLowerCase().endsWith("/campuslogin")) {
+      repoPrefix = currentPath.substring(0, currentPath.length - "/campuslogin".length);
     } else if (currentPath.toLowerCase().endsWith("/databasemessage2083")) {
       repoPrefix = currentPath.substring(0, currentPath.length - "/databasemessage2083".length);
     } else {
@@ -94,7 +94,7 @@ export default function App() {
     }
 
     if (targetRoute === "cms") {
-      newUrl.pathname = repoPrefix + "/fsudmclogin";
+      newUrl.pathname = repoPrefix + "/campuslogin";
       window.history.pushState({}, "", newUrl.toString());
     } else if (targetRoute === "messages") {
       newUrl.pathname = repoPrefix + "/databasemessage2083";
