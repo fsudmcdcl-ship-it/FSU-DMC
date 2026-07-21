@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Redirecting...</title>
+  <script>
+    var pathname = window.location.pathname;
+    var targetPath = pathname;
+    if (targetPath.endsWith('/')) {
+      targetPath = targetPath.slice(0, -1);
+    }
+    if (targetPath.endsWith('/databasemessage2083')) {
+      targetPath = targetPath.substring(0, targetPath.length - '/databasemessage2083'.length);
+    }
+    if (!targetPath.endsWith('/')) {
+      targetPath += '/';
+    }
+    var targetUrl = window.location.origin + targetPath + '#messages';
+    window.location.replace(targetUrl);
+  </script>
+</head>
+<body>
+  <p>Redirecting to restricted FSU Inbox...</p>
+</body>
+</html>

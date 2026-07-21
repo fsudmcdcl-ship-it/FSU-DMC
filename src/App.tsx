@@ -48,9 +48,9 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const pageParam = params.get("page");
 
-      if (path.endsWith("/campuslogin") || hash === "#campuslogin" || pageParam === "campuslogin") {
+      if (path.endsWith("/campuslogin") || hash === "#campuslogin" || hash === "#/campuslogin" || pageParam === "campuslogin") {
         setRoute("cms");
-      } else if (path.endsWith("/databasemessage2083") || hash === "#messages" || pageParam === "messages") {
+      } else if (path.endsWith("/databasemessage2083") || hash === "#messages" || hash === "#/messages" || pageParam === "messages") {
         setRoute("messages");
       } else {
         setRoute("home");
@@ -94,13 +94,16 @@ export default function App() {
     }
 
     if (targetRoute === "cms") {
-      newUrl.pathname = repoPrefix + "/campuslogin";
+      newUrl.pathname = repoPrefix + "/";
+      newUrl.hash = "campuslogin";
       window.history.pushState({}, "", newUrl.toString());
     } else if (targetRoute === "messages") {
-      newUrl.pathname = repoPrefix + "/databasemessage2083";
+      newUrl.pathname = repoPrefix + "/";
+      newUrl.hash = "messages";
       window.history.pushState({}, "", newUrl.toString());
     } else {
       newUrl.pathname = repoPrefix + "/";
+      newUrl.hash = "";
       window.history.pushState({}, "", newUrl.toString());
     }
   };
