@@ -63,14 +63,13 @@ export default function Header({
       <div className="w-full border-b border-gray-200/80 bg-white shadow-sm relative">
         <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           {/* Brand Identity */}
-          <div className="flex items-center gap-4">
-            <a
-              href="/home"
-              onClick={(e) => {
-                e.preventDefault();
-                onNavClick("home");
-              }}
-              className="flex items-center gap-3.5 group cursor-pointer"
+          <div className="flex items-center gap-3.5">
+            <button
+              type="button"
+              id="header-brand-logo-btn"
+              onClick={() => onNavClick("home")}
+              className="flex items-center group cursor-pointer border-0 bg-transparent p-0 outline-none"
+              aria-label="Go to Homepage"
             >
               <img
                 id="header-logo"
@@ -82,28 +81,35 @@ export default function Header({
                 className="w-14 h-14 object-cover rounded-full shadow-md border-2 border-red-700 ring-2 ring-red-50 group-hover:scale-105 transition-transform"
                 referrerPolicy="no-referrer"
               />
-              <div>
-                <h1 className="text-xl md:text-2xl font-serif font-black tracking-tight text-blue-950">
+            </button>
+            <div>
+              <button
+                type="button"
+                id="header-brand-title-btn"
+                onClick={() => onNavClick("home")}
+                className="text-left group cursor-pointer border-0 bg-transparent p-0 block outline-none"
+              >
+                <h1 className="text-xl md:text-2xl font-serif font-black tracking-tight text-blue-950 group-hover:text-red-700 transition-colors">
                   {settings?.titleEn || "Free Student Union - DMC"}
                 </h1>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-600 font-sans">
                   {settings?.subtitleEn || "Darchula Multiple Campus, Khalanga"}
                 </p>
-                <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-semibold text-red-700">
-                  <span>Affiliated to</span>
-                  <a
-                    href="https://fwu.edu.np"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="underline hover:text-red-900 inline-flex items-center gap-0.5"
-                  >
-                    <span>Farwestern University</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
+              </button>
+              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-semibold text-red-700">
+                <span>Affiliated to</span>
+                <a
+                  id="link-fwu-affiliation"
+                  href="https://fwu.edu.np"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-red-900 inline-flex items-center gap-0.5"
+                >
+                  <span>Farwestern University</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
               </div>
-            </a>
+            </div>
           </div>
 
           {/* Clock & Action Controls */}

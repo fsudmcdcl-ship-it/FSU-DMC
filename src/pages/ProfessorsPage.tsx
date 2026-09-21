@@ -1,19 +1,8 @@
 import React, { useState } from "react";
 import { GraduationCap, Mail, BookOpen, Award, Search, Clock, ExternalLink } from "lucide-react";
+import { ProfessorItem } from "../types";
 
-interface Professor {
-  id: string;
-  name: string;
-  title: string;
-  faculty: string;
-  department: string;
-  qualification: string;
-  subjects: string[];
-  researchInterests: string;
-  email: string;
-  officeHours: string;
-  imageUrl: string;
-}
+type Professor = ProfessorItem;
 
 const PROFESSORS: Professor[] = [
   {
@@ -103,11 +92,17 @@ const FACULTIES = [
   "Faculty of Humanities & Social Sciences",
 ];
 
-export default function ProfessorsPage() {
+interface ProfessorsPageProps {
+  professors?: Professor[];
+}
+
+export default function ProfessorsPage({ professors }: ProfessorsPageProps) {
   const [selectedFaculty, setSelectedFaculty] = useState("All Faculties");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredProfessors = PROFESSORS.filter((prof) => {
+  const professorList = professors && professors.length > 0 ? professors : PROFESSORS;
+
+  const filteredProfessors = professorList.filter((prof) => {
     const matchesFaculty = selectedFaculty === "All Faculties" || prof.faculty === selectedFaculty;
     const matchesSearch =
       prof.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

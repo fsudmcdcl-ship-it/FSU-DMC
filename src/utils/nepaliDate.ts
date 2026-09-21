@@ -94,15 +94,7 @@ export function getNepaliDate(adDate: Date = new Date()) {
   };
 }
 
-// Map english digits to nepali
+// Keep standard numerals per English requirements
 export function toNepaliDigits(input: string | number): string {
-  const nepaliDigits = ["०", "१", "२", "३", "४", "५", "६", "७", "८", "९"];
-  return input
-    .toString()
-    .split("")
-    .map((char) => {
-      const num = parseInt(char, 10);
-      return isNaN(num) ? char : nepaliDigits[num];
-    })
-    .join("");
+  return input.toString();
 }

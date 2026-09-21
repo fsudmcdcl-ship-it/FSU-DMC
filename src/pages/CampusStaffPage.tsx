@@ -1,17 +1,8 @@
 import React, { useState } from "react";
 import { Users, Mail, MapPin, Clock, Search, Phone, ExternalLink, ShieldCheck } from "lucide-react";
+import { StaffItem } from "../types";
 
-interface StaffMember {
-  id: string;
-  name: string;
-  designation: string;
-  department: string;
-  email: string;
-  phone: string;
-  office: string;
-  workingHours: string;
-  imageUrl: string;
-}
+type StaffMember = StaffItem;
 
 const STAFF_MEMBERS: StaffMember[] = [
   {
@@ -113,11 +104,17 @@ const DEPARTMENTS = [
   "ICT & Technical Support",
 ];
 
-export default function CampusStaffPage() {
+interface CampusStaffPageProps {
+  staff?: StaffMember[];
+}
+
+export default function CampusStaffPage({ staff }: CampusStaffPageProps) {
   const [selectedDept, setSelectedDept] = useState("All Departments");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredStaff = STAFF_MEMBERS.filter((member) => {
+  const staffList = staff && staff.length > 0 ? staff : STAFF_MEMBERS;
+
+  const filteredStaff = staffList.filter((member) => {
     const matchesDept = selectedDept === "All Departments" || member.department === selectedDept;
     const matchesSearch =
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -78,18 +78,53 @@ export interface TeamMember {
 export interface ContactSubmission {
   id: string;
   name: string;
-  className: string;
-  semester: string;
-  contactInfo: string;
+  className?: string;
+  semester?: string;
+  contactInfo?: string;
   message: string;
-  isAnonymous: boolean;
+  isAnonymous?: boolean;
   createdAt: number;
+  phone?: string;
+  email?: string;
+  rollNumber?: string;
+  faculty?: string;
+  category?: string;
+  ticketId?: string;
+  tag?: string;
+  status?: string;
+  subject?: string;
+}
+
+export interface StaffItem {
+  id: string;
+  name: string;
+  designation: string;
+  department: string;
+  email: string;
+  phone: string;
+  office: string;
+  workingHours: string;
+  imageUrl: string;
+}
+
+export interface ProfessorItem {
+  id: string;
+  name: string;
+  title: string;
+  faculty: string;
+  department: string;
+  qualification: string;
+  subjects: string[];
+  researchInterests: string;
+  email: string;
+  officeHours: string;
+  imageUrl: string;
 }
 
 export interface ImportantNotice {
   active: boolean;
   titleEn: string;
-  titleNp: string;
+  titleNp?: string;
   imageUrl?: string;
   bodyEn?: string;
   bodyNp?: string;
@@ -107,4 +142,6 @@ export interface DatabaseState {
   team: Record<string, TeamMember>;
   contacts: Record<string, ContactSubmission>;
   importantNotice: ImportantNotice;
+  staff?: Record<string, StaffItem>;
+  professors?: Record<string, ProfessorItem>;
 }

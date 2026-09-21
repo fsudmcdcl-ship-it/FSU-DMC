@@ -176,11 +176,9 @@ export default function Footer({ onNavigate }: FooterProps) {
           Built with Love, Dedicated to FSUDMC —{" "}
           <a
             id="amit-signature"
-            href="https://amitjoshi.info.np"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="https://www.fsudmc.com/#contact"
             className="text-amber-400 hover:text-amber-300 underline decoration-amber-400/80 transition-colors"
-            title="Profile of Amit"
+            title="Profile of Amit - FSU President"
           >
             <b>BY AMIT</b>
           </a>

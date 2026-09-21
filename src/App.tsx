@@ -10,6 +10,8 @@ import {
   DownloadItem,
   TeamMember,
   BlogItem,
+  StaffItem,
+  ProfessorItem,
 } from "./types";
 import { DEFAULT_DB_STATE } from "./lib/defaults";
 
@@ -112,7 +114,7 @@ export default function App() {
 
     // Check pathname
     if (path.endsWith("/campuslogin")) return "campuslogin";
-    if (path.endsWith("/databasemessage2083")) return "databasemessage2083";
+    if (path.endsWith("/messages") || path.endsWith("/databasemessage2083")) return "databasemessage2083";
     if (path.endsWith("/about")) return "about";
     if (path.endsWith("/syllabus-notes")) return "syllabus-notes";
     if (path.endsWith("/fsu-team")) return "fsu-team";
@@ -184,6 +186,8 @@ export default function App() {
       "downloads",
       "blogs",
       "team",
+      "staff",
+      "professors",
     ];
 
     let loadedCount = 0;
@@ -225,6 +229,8 @@ export default function App() {
   const downloads: DownloadItem[] = dbState?.downloads ? Object.values(dbState.downloads) : [];
   const blogs: BlogItem[] = dbState?.blogs ? Object.values(dbState.blogs) : [];
   const team: TeamMember[] = dbState?.team ? Object.values(dbState.team) : [];
+  const staff: StaffItem[] | undefined = dbState?.staff ? (Object.values(dbState.staff) as StaffItem[]) : undefined;
+  const professors: ProfessorItem[] | undefined = dbState?.professors ? (Object.values(dbState.professors) as ProfessorItem[]) : undefined;
   const importantNotice: ImportantNotice = dbState?.importantNotice || ({ active: false } as ImportantNotice);
 
   const president = team.find((m) => m.order === 1);
@@ -444,8 +450,8 @@ export default function App() {
           />
         )}
         {currentRoute === "contact" && <ContactPage />}
-        {currentRoute === "campus-staff" && <CampusStaffPage />}
-        {currentRoute === "professors" && <ProfessorsPage />}
+        {currentRoute === "campus-staff" && <CampusStaffPage staff={staff} />}
+        {currentRoute === "professors" && <ProfessorsPage professors={professors} />}
         {currentRoute === "fsu-helpdesk" && <HelpdeskPage />}
         {currentRoute === "contact-secretariat" && <SecretariatPage />}
         {currentRoute === "privacy-policy" && (

@@ -1,10 +1,55 @@
 import React, { useState, useEffect } from "react";
-import { ref, update, set, remove, push, onValue } from "firebase/database";
-import { signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { rtdb, auth } from "../lib/firebase";
-import { DatabaseState, GeneralSettings, SlideItem, NewsItem, TeamMember, DownloadItem, BlogItem, ImportantNotice } from "../types";
+import { ref, set, remove, push } from "firebase/database";
 import {
-  Lock, ShieldAlert, Edit, Trash2, Plus, Save, Settings, Sliders, FileText, Users, Download, PenTool, AlertOctagon, LogOut, CheckCircle, Upload, Inbox, Mail, Eye, EyeOff
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail
+} from "firebase/auth";
+import { rtdb, auth } from "../lib/firebase";
+import {
+  DatabaseState,
+  GeneralSettings,
+  SlideItem,
+  NewsItem,
+  TeamMember,
+  DownloadItem,
+  BlogItem,
+  ImportantNotice,
+  StaffItem,
+  ProfessorItem
+} from "../types";
+import {
+  Lock,
+  Edit,
+  Trash2,
+  Plus,
+  Save,
+  Settings,
+  Sliders,
+  FileText,
+  Users,
+  Download,
+  PenTool,
+  AlertOctagon,
+  LogOut,
+  CheckCircle,
+  Upload,
+  Inbox,
+  Mail,
+  Eye,
+  EyeOff,
+  Globe,
+  Radio,
+  GraduationCap,
+  Briefcase,
+  HelpCircle,
+  ExternalLink,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 
 interface CMSPanelProps {
@@ -14,32 +59,39 @@ interface CMSPanelProps {
   onGoMessages: () => void;
 }
 
-const APPROVED_CMS_USERS = [
-  "fsudmcdcl@gmail.com", // Main user email
-  "amitjoc@gmail.com",
-  "fsudmc.edu.np@gmail.com",
-  "admin@admin.com"
-];
+type CMSTab =
+  | "general"
+  | "slides"
+  | "news"
+  | "team"
+  | "downloads"
+  | "blogs"
+  | "popup"
+  | "staff"
+  | "professors"
+  | "helpdesk";
 
-type CMSTab = "general" | "slides" | "news" | "team" | "downloads" | "blogs" | "popup";
-
-export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPanelProps) {
+export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProps) {
   const [user, setUser] = useState(auth.currentUser);
   const [activeTab, setActiveTab] = useState<CMSTab>("general");
   const [authError, setAuthError] = useState("");
+  const [authSuccess, setAuthSuccess] = useState("");
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [saveMode, setSaveMode] = useState<"draft" | "live" | null>(null);
+  const [toastMessage, setToastMessage] = useState("");
 
-  // Email and Password Login/Register States
+  // Email and Password Login States
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
 
   // Form states
-  const [genSettingsForm, setGenSettingsForm] = useState<GeneralSettings>(state?.generalSettings || {} as GeneralSettings);
-  const [importantNoticeForm, setImportantNoticeForm] = useState<ImportantNotice>(state?.importantNotice || {} as ImportantNotice);
+  const [genSettingsForm, setGenSettingsForm] = useState<GeneralSettings>(state?.generalSettings || ({} as GeneralSettings));
+  const [importantNoticeForm, setImportantNoticeForm] = useState<ImportantNotice>(state?.importantNotice || ({} as ImportantNotice));
 
   // Lists from state
   const slides = state?.slides ? Object.values(state.slides) : [];
@@ -47,13 +99,38 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
   const team = state?.team ? Object.values(state.team) : [];
   const downloads = state?.downloads ? Object.values(state.downloads) : [];
   const blogs = state?.blogs ? Object.values(state.blogs) : [];
+  const staff = state?.staff ? Object.values(state.staff) : [];
+  const professors = state?.professors ? Object.values(state.professors) : [];
 
   // Temporary item forms
-  const [newSlide, setNewSlide] = useState({ titleEn: "", titleNp: "", imageUrl: "" });
-  const [newNews, setNewNews] = useState({ headingEn: "", headingNp: "", bodyEn: "", bodyNp: "", imageUrl: "" });
-  const [newMember, setNewMember] = useState({ nameEn: "", nameNp: "", roleEn: "", roleNp: "", imageUrl: "", order: 6 });
-  const [newDownload, setNewDownload] = useState({ titleEn: "", titleNp: "", fileUrl: "", isDriveLink: true });
-  const [newBlog, setNewBlog] = useState({ headingEn: "", headingNp: "", bodyEn: "", bodyNp: "", imageUrl: "", authorEn: "", authorNp: "" });
+  const [newSlide, setNewSlide] = useState({ titleEn: "", imageUrl: "" });
+  const [newNews, setNewNews] = useState({ headingEn: "", bodyEn: "", imageUrl: "" });
+  const [newMember, setNewMember] = useState({ nameEn: "", roleEn: "", imageUrl: "", order: 6 });
+  const [newDownload, setNewDownload] = useState({ titleEn: "", fileUrl: "", isDriveLink: true });
+  const [newBlog, setNewBlog] = useState({ headingEn: "", bodyEn: "", imageUrl: "", authorEn: "" });
+  const [newStaff, setNewStaff] = useState<Omit<StaffItem, "id">>({
+    name: "",
+    designation: "",
+    department: "Administration",
+    email: "",
+    phone: "",
+    office: "",
+    workingHours: "Sunday – Friday: 10:00 AM – 5:00 PM",
+    imageUrl: ""
+  });
+  const [newProf, setNewProf] = useState<Omit<ProfessorItem, "id">>({
+    name: "",
+    title: "",
+    faculty: "Faculty of Management",
+    department: "",
+    qualification: "",
+    subjects: [],
+    researchInterests: "",
+    email: "",
+    officeHours: "Sunday – Thursday: 11:00 AM – 1:00 PM",
+    imageUrl: ""
+  });
+  const [profSubjectsInput, setProfSubjectsInput] = useState("");
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currUser) => {
@@ -70,13 +147,22 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
     if (state?.importantNotice) setImportantNoticeForm(state.importantNotice);
   }, [state]);
 
-  const handleLogin = async () => {
+  const showToast = (txt: string) => {
+    setToastMessage(txt);
+    setTimeout(() => setToastMessage(""), 5000);
+  };
+
+  const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
     setAuthError("");
+    setAuthSuccess("");
+    setLoginLoading(true);
     try {
       await signInWithPopup(auth, provider);
     } catch (err: any) {
-      setAuthError("Failed to authenticate with Google.");
+      setAuthError(err.message || "Failed to authenticate with Google.");
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -84,36 +170,30 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
     await signOut(auth);
   };
 
-  const handleEmailPasswordAuth = async (e: React.FormEvent) => {
+  const handleEmailPasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setAuthError("Please enter both email and password.");
+      setAuthError("Please enter both authorized admin email and password.");
       return;
     }
 
     const trimmedEmail = email.trim();
-
     setLoginLoading(true);
     setAuthError("");
+    setAuthSuccess("");
+
     try {
-      if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, trimmedEmail, password);
-        showToast("Administrator account successfully created and logged in!");
-      } else {
-        await signInWithEmailAndPassword(auth, trimmedEmail, password);
-        showToast("Successfully signed in to admin portal!");
-      }
+      await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      showToast("Successfully signed in to FSU CMS Control Center!");
     } catch (err: any) {
       console.error("Firebase Auth Error:", err);
       let errMsg = "Failed to authenticate. Please check your credentials.";
-      if (err.code === "auth/user-not-found") {
-        errMsg = "Admin user not found. If this is your first time logging in, toggle 'Register Admin Account' below.";
+      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+        errMsg = "Admin user not found or invalid credentials. If you need access, contact the FSU system administrator.";
       } else if (err.code === "auth/wrong-password") {
-        errMsg = "Incorrect password. Please verify your credentials.";
-      } else if (err.code === "auth/weak-password") {
-        errMsg = "Password must be at least 6 characters long.";
-      } else if (err.code === "auth/email-already-in-use") {
-        errMsg = "An account with this email is already registered. Try logging in instead.";
+        errMsg = "Incorrect password. Click 'Forgot Password?' to reset it.";
+      } else if (err.code === "auth/too-many-requests") {
+        errMsg = "Access temporarily blocked due to repeated failed attempts. Please try again later or reset your password.";
       } else if (err.message) {
         errMsg = err.message;
       }
@@ -123,9 +203,32 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
     }
   };
 
-  const showToast = (txt: string) => {
-    setMessage(txt);
-    setTimeout(() => setMessage(""), 4000);
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetEmail = (resetEmail || email).trim();
+    if (!targetEmail) {
+      setAuthError("Please enter your registered admin email address.");
+      return;
+    }
+
+    setResetLoading(true);
+    setAuthError("");
+    setAuthSuccess("");
+
+    try {
+      await sendPasswordResetEmail(auth, targetEmail);
+      setAuthSuccess(`Password reset email dispatched to ${targetEmail}. Please check your inbox or spam folder.`);
+      setShowForgotPassword(false);
+    } catch (err: any) {
+      console.error("Password reset error:", err);
+      if (err.code === "auth/user-not-found") {
+        setAuthError("No registered administrator found with this email.");
+      } else {
+        setAuthError(err.message || "Failed to dispatch password reset email. Please try again.");
+      }
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   // Convert uploaded image file to lightweight Base64 string for direct DB storage
@@ -147,96 +250,212 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
     reader.readAsDataURL(file);
   };
 
-  // Saving General Settings
-  const saveGeneralSettings = async () => {
+  // -------------------------------------------------------------
+  // TWO SAVE OPTIONS:
+  // 1) SAVE DATA (Local Staging / Draft Cache)
+  // 2) GLOBAL LIVE (Direct Commit to Firebase Realtime Database)
+  // -------------------------------------------------------------
+
+  const handleSaveGeneral = async (mode: "draft" | "live") => {
     setSaving(true);
+    setSaveMode(mode);
+
+    if (mode === "draft") {
+      try {
+        localStorage.setItem("fsudmc_draft_generalSettings", JSON.stringify(genSettingsForm));
+        showToast("General Settings saved to Local Draft Cache! (Staged)");
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setSaving(false);
+        setSaveMode(null);
+      }
+      return;
+    }
+
+    // Global Live via Firebase
     try {
       await set(ref(rtdb, "generalSettings"), genSettingsForm);
-      showToast("General settings updated successfully!");
+      showToast("General settings published Globally Live to Firebase!");
     } catch (err) {
-      alert("Failed to save settings: " + err);
+      alert("Failed to publish live settings: " + err);
     } finally {
       setSaving(false);
+      setSaveMode(null);
     }
   };
 
-  // Saving Important Notice Popup settings
-  const saveImportantNotice = async () => {
+  const handleSaveImportantNotice = async (mode: "draft" | "live") => {
     setSaving(true);
+    setSaveMode(mode);
+
+    if (mode === "draft") {
+      try {
+        localStorage.setItem("fsudmc_draft_importantNotice", JSON.stringify(importantNoticeForm));
+        showToast("Notice popup configuration saved to Local Draft Cache! (Staged)");
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setSaving(false);
+        setSaveMode(null);
+      }
+      return;
+    }
+
+    // Global Live via Firebase
     try {
       await set(ref(rtdb, "importantNotice"), importantNoticeForm);
-      showToast("Important Notice popup updated successfully!");
+      showToast("Notice popup published Globally Live to Firebase!");
     } catch (err) {
-      alert("Failed to save notice: " + err);
+      alert("Failed to publish live notice: " + err);
     } finally {
       setSaving(false);
+      setSaveMode(null);
     }
   };
 
   // Adding items to lists
   const addSlide = async () => {
-    if (!newSlide.imageUrl) return alert("Please specify/upload an image.");
+    if (!newSlide.imageUrl) return alert("Please specify or upload an image for the slide.");
     try {
       const slidesRef = ref(rtdb, "slides");
       const newItemRef = push(slidesRef);
       await set(newItemRef, { id: newItemRef.key, ...newSlide });
-      setNewSlide({ titleEn: "", titleNp: "", imageUrl: "" });
-      showToast("Slide added successfully!");
+      setNewSlide({ titleEn: "", imageUrl: "" });
+      showToast("Hero carousel slide published globally live!");
     } catch (err) { alert(err); }
   };
 
   const addNews = async () => {
-    if (!newNews.headingEn || !newNews.bodyEn) return alert("Please specify news titles and body.");
+    if (!newNews.headingEn || !newNews.bodyEn) return alert("Please specify news title and body text.");
     try {
       const newsRef = ref(rtdb, "news");
       const newItemRef = push(newsRef);
       await set(newItemRef, { id: newItemRef.key, ...newNews, createdAt: Date.now() });
-      setNewNews({ headingEn: "", headingNp: "", bodyEn: "", bodyNp: "", imageUrl: "" });
-      showToast("Announcement published successfully!");
+      setNewNews({ headingEn: "", bodyEn: "", imageUrl: "" });
+      showToast("Announcement published globally live!");
     } catch (err) { alert(err); }
   };
 
   const addMember = async () => {
-    if (!newMember.nameEn || !newMember.roleEn) return alert("Please specify name and role.");
+    if (!newMember.nameEn || !newMember.roleEn) return alert("Please specify representative name and role.");
     if (team.length >= 30) return alert("FSU Committee displays a maximum of 30 cards. Please delete an existing card first.");
     try {
       const teamRef = ref(rtdb, "team");
       const newItemRef = push(teamRef);
       await set(newItemRef, { id: newItemRef.key, ...newMember, order: Number(newMember.order) });
-      setNewMember({ nameEn: "", nameNp: "", roleEn: "", roleNp: "", imageUrl: "", order: 6 });
-      showToast("FSU Team member card created!");
+      setNewMember({ nameEn: "", roleEn: "", imageUrl: "", order: 6 });
+      showToast("FSU Team member card published globally live!");
     } catch (err) { alert(err); }
   };
 
   const addDownload = async () => {
-    if (!newDownload.titleEn || !newDownload.fileUrl) return alert("Please specify document title and link.");
+    if (!newDownload.titleEn || !newDownload.fileUrl) return alert("Please specify document title and resource link.");
     try {
       const dlRef = ref(rtdb, "downloads");
       const newItemRef = push(dlRef);
       await set(newItemRef, { id: newItemRef.key, ...newDownload });
-      setNewDownload({ titleEn: "", titleNp: "", fileUrl: "", isDriveLink: true });
-      showToast("Syllabus resource added!");
+      setNewDownload({ titleEn: "", fileUrl: "", isDriveLink: true });
+      showToast("Syllabus resource published globally live!");
     } catch (err) { alert(err); }
   };
 
   const addBlog = async () => {
-    if (!newBlog.headingEn || !newBlog.bodyEn) return alert("Please specify heading and content.");
+    if (!newBlog.headingEn || !newBlog.bodyEn) return alert("Please specify article heading and content.");
     try {
       const blogRef = ref(rtdb, "blogs");
       const newItemRef = push(blogRef);
       await set(newItemRef, { id: newItemRef.key, ...newBlog, createdAt: Date.now() });
-      setNewBlog({ headingEn: "", headingNp: "", bodyEn: "", bodyNp: "", imageUrl: "", authorEn: "", authorNp: "" });
-      showToast("Student blog post published!");
+      setNewBlog({ headingEn: "", bodyEn: "", imageUrl: "", authorEn: "" });
+      showToast("Student blog article published globally live!");
+    } catch (err) { alert(err); }
+  };
+
+  const addStaff = async () => {
+    if (!newStaff.name || !newStaff.designation) return alert("Please specify staff name and designation.");
+    try {
+      const staffRef = ref(rtdb, "staff");
+      const newItemRef = push(staffRef);
+      await set(newItemRef, { id: newItemRef.key, ...newStaff });
+      setNewStaff({
+        name: "",
+        designation: "",
+        department: "Administration",
+        email: "",
+        phone: "",
+        office: "",
+        workingHours: "Sunday – Friday: 10:00 AM – 5:00 PM",
+        imageUrl: ""
+      });
+      showToast("Campus staff member published globally live!");
+    } catch (err) { alert(err); }
+  };
+
+  const addProfessor = async () => {
+    if (!newProf.name || !newProf.title) return alert("Please specify professor name and academic title.");
+    try {
+      const profRef = ref(rtdb, "professors");
+      const newItemRef = push(profRef);
+      const subjectsArray = profSubjectsInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await set(newItemRef, { id: newItemRef.key, ...newProf, subjects: subjectsArray });
+      setNewProf({
+        name: "",
+        title: "",
+        faculty: "Faculty of Management",
+        department: "",
+        qualification: "",
+        subjects: [],
+        researchInterests: "",
+        email: "",
+        officeHours: "Sunday – Thursday: 11:00 AM – 1:00 PM",
+        imageUrl: ""
+      });
+      setProfSubjectsInput("");
+      showToast("Professor published globally live!");
     } catch (err) { alert(err); }
   };
 
   // Deleting items
   const deleteItem = async (node: string, id: string) => {
-    if (!window.confirm("Delete this item permanently?")) return;
+    if (!window.confirm("Permanently delete this item from the live database?")) return;
     try {
       await remove(ref(rtdb, `${node}/${id}`));
-      showToast("Item deleted from database.");
+      showToast("Item removed from database.");
     } catch (err) { alert(err); }
+  };
+
+  // Master Save All Functionality
+  const handleMasterAction = async (mode: "draft" | "live") => {
+    setSaving(true);
+    setSaveMode(mode);
+
+    if (mode === "draft") {
+      try {
+        localStorage.setItem("fsudmc_draft_generalSettings", JSON.stringify(genSettingsForm));
+        localStorage.setItem("fsudmc_draft_importantNotice", JSON.stringify(importantNoticeForm));
+        showToast("All current settings & notices saved to Local Staging Cache!");
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setSaving(false);
+        setSaveMode(null);
+      }
+      return;
+    }
+
+    try {
+      await set(ref(rtdb, "generalSettings"), genSettingsForm);
+      await set(ref(rtdb, "importantNotice"), importantNoticeForm);
+      showToast("All settings & notices published Globally Live to Firebase!");
+    } catch (err) {
+      alert("Failed to publish live: " + err);
+    } finally {
+      setSaving(false);
+      setSaveMode(null);
+    }
   };
 
   // Login Screen Gate
@@ -244,116 +463,172 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4 bg-slate-50">
         <div className="bg-white p-8 rounded-3xl max-w-md w-full shadow-xl border border-slate-200 flex flex-col items-center">
-          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4 border border-emerald-100 shadow-inner">
-            <Lock className="w-8 h-8" />
+          <div className="w-16 h-16 bg-blue-50 text-blue-900 rounded-full flex items-center justify-center mb-4 border border-blue-100 shadow-inner">
+            <Lock className="w-8 h-8 text-blue-950" />
           </div>
 
-          <h3 className="text-xl font-extrabold text-gray-900 mb-1">
+          <h3 className="text-xl font-extrabold text-gray-900 mb-1 font-serif text-center">
             FSU CMS Control Center
           </h3>
-          <p className="text-xs text-slate-400 font-mono tracking-wider uppercase mb-5">
-            fsudmc.amitjoshi.info.np/campuslogin
+          <p className="text-xs text-blue-900 font-mono tracking-wider uppercase mb-4 font-semibold">
+            https://www.fsudmc.com/#campuslogin
           </p>
 
           <p className="text-xs text-gray-500 mb-6 text-center leading-relaxed">
-            Please log in with your authorized administrator Firebase credentials to manage homepage contents, banners, news tickers, downloads, and committee lists.
+            Authorized administrator portal for Free Student Union - DMC. Manage all website content, hero sliders, news, faculty, staff, syllabus, and emergency notices.
           </p>
 
+          {authSuccess && (
+            <div className="w-full p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold mb-5 flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>{authSuccess}</span>
+            </div>
+          )}
+
           {authError && (
-            <div className="w-full p-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-xs font-semibold mb-5 flex items-start gap-2 text-left">
-              <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <div className="w-full p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold mb-5 flex items-start gap-2 text-left">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <span>{authError}</span>
             </div>
           )}
 
-          {/* Email and Password Form */}
-          <form onSubmit={handleEmailPasswordAuth} className="w-full space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Authorized Admin Email
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                  <Mail className="w-4 h-4" />
-                </span>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-                />
+          {!showForgotPassword ? (
+            /* Email and Password Form */
+            <form onSubmit={handleEmailPasswordLogin} className="w-full space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Authorized Admin Email
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="fsudmcdcl@gmail.com"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Admin Password
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                  <Lock className="w-4 h-4" />
-                </span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-                />
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Admin Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setShowForgotPassword(true);
+                      setAuthError("");
+                      setAuthSuccess("");
+                    }}
+                    className="text-xs text-blue-900 hover:text-blue-950 font-bold hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                    <Lock className="w-4 h-4" />
+                  </span>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full py-3 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {loginLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                )}
+                <span>Log In to CMS Panel</span>
+              </button>
+            </form>
+          ) : (
+            /* Forgot Password Form */
+            <form onSubmit={handleForgotPassword} className="w-full space-y-4 text-left">
+              <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-xs text-blue-950 leading-relaxed">
+                Enter your registered admin email address below to receive an encrypted Firebase Authentication password reset email.
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Admin Email
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="name@fsudmc.com"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="flex-1 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {resetLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                  <span>Send Reset Email</span>
+                </button>
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setAuthError("");
+                  }}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  Cancel
                 </button>
               </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-100 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {loginLoading ? (
-                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              <span>{isRegistering ? "Create & Register Admin" : "Log In with Credentials"}</span>
-            </button>
-          </form>
-
-          {/* Registration Mode Switcher */}
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegistering(!isRegistering);
-                setAuthError("");
-              }}
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-bold transition underline"
-            >
-              {isRegistering ? "Already have an admin password? Sign In" : "First time? Register your Admin Email Password"}
-            </button>
-          </div>
+            </form>
+          )}
 
           {/* Separator */}
-          <div className="w-full flex items-center my-6">
+          <div className="w-full flex items-center my-5">
             <div className="flex-1 border-t border-slate-200"></div>
-            <span className="px-3 text-xs text-gray-400 font-medium">OR FALLBACK</span>
+            <span className="px-3 text-xs text-gray-400 font-medium">OR FIREBASE AUTH</span>
             <div className="flex-1 border-t border-slate-200"></div>
           </div>
 
           <div className="w-full space-y-3">
             <button
-              onClick={handleLogin}
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+              onClick={handleGoogleLogin}
+              disabled={loginLoading}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <Users className="w-4 h-4" />
+              <Users className="w-4 h-4 text-emerald-400" />
               <span>Sign In with Google Auth</span>
             </button>
 
@@ -362,7 +637,7 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
                 onClick={handleSignOut}
                 className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
               >
-                Sign Out Current Session ({user.email})
+                Sign Out Session ({user.email})
               </button>
             )}
 
@@ -381,45 +656,72 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
       {/* Toast feedback notifications */}
-      {message && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 bg-emerald-800 text-white rounded-2xl shadow-2xl border border-emerald-700 flex items-center gap-2 animate-bounce">
-          <CheckCircle className="w-5 h-5 text-yellow-300" />
-          <span className="text-sm font-bold">{message}</span>
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 bg-blue-950 text-white rounded-2xl shadow-2xl border border-blue-800 flex items-center gap-3 animate-fade-in">
+          <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="text-sm font-bold">{toastMessage}</span>
         </div>
       )}
 
       {/* Admin header */}
-      <div className="bg-slate-950 p-6 rounded-3xl text-white mb-8 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-blue-950 p-6 md:p-8 rounded-3xl text-white mb-8 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <span className="text-xs uppercase font-bold text-emerald-400 tracking-widest font-mono">
-            ADMIN PORTAL DIRECTORY
-          </span>
-          <h2 className="text-2xl font-black">FSU Website Dynamic CMS</h2>
-          <p className="text-xs text-gray-400 font-mono mt-1">
-            Administrator: <span className="text-emerald-300 font-bold">{user.email}</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-xs font-bold uppercase tracking-wider text-emerald-300 mb-2">
+            <Radio className="w-3.5 h-3.5 animate-pulse" />
+            Live Firebase CMS &bull; Encrypted Session
+          </div>
+          <h2 className="text-2xl md:text-3xl font-serif font-black">
+            FSU CMS Control Center
+          </h2>
+          <p className="text-xs text-blue-200/80 font-mono mt-1">
+            Admin: <span className="text-emerald-300 font-bold">{user.email}</span> &bull; URL: <span className="text-amber-300 font-semibold">https://www.fsudmc.com/#campuslogin</span>
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Master Control Buttons: Save Data & Global Live */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => handleMasterAction("draft")}
+            disabled={saving}
+            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-600 shadow-sm cursor-pointer disabled:opacity-50"
+            title="Save changes to local staging cache for review"
+          >
+            <Save className="w-4 h-4 text-amber-400" />
+            <span>{saving && saveMode === "draft" ? "Saving..." : "Save Data (Draft)"}</span>
+          </button>
+
+          <button
+            onClick={() => handleMasterAction("live")}
+            disabled={saving}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-emerald-900/30 cursor-pointer disabled:opacity-50"
+            title="Commit changes live to Firebase Realtime Database across the world"
+          >
+            <Globe className="w-4 h-4 text-white animate-spin-slow" />
+            <span>{saving && saveMode === "live" ? "Publishing..." : "Publish Global Live"}</span>
+          </button>
+
           <button
             onClick={onGoMessages}
-            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md"
+            className="px-4 py-2.5 bg-blue-900 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md"
+            title="Access incoming student Helpdesk tickets & inquiries"
           >
-            <Inbox className="w-4 h-4" />
-            <span>Student Inbox Portal</span>
+            <Inbox className="w-4 h-4 text-amber-300" />
+            <span>Helpdesk Inbox</span>
           </button>
+
           <button
             onClick={onGoHome}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 rounded-xl text-xs font-bold transition"
+            className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition"
           >
             Public Site
           </button>
+
           <button
             onClick={handleSignOut}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
+            className="p-2.5 bg-red-700 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
+            title="Sign Out"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Logout</span>
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -427,608 +729,483 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
       {/* Navigation and Editors layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Navigation Tabs list */}
-        <div className="lg:col-span-3 bg-white p-4 rounded-3xl shadow-md border border-gray-100 flex flex-col gap-1.5">
+        <div className="lg:col-span-3 bg-white p-4 rounded-3xl shadow-sm border border-slate-200 flex flex-col gap-1">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-3 mb-2 block">
-            MANAGE CATEGORIES
+            MANAGE WEBSITE CONTENT
           </span>
+
           <button
             onClick={() => setActiveTab("general")}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "general" ? "bg-emerald-800 text-white" : "hover:bg-slate-50 text-slate-700"
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "general" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>General Setup</span>
+            <span>General Setup & Branding</span>
           </button>
+
           <button
             onClick={() => setActiveTab("slides")}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "slides" ? "bg-emerald-800 text-white" : "hover:bg-slate-50 text-slate-700"
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "slides" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
             }`}
           >
             <Sliders className="w-4 h-4" />
-            <span>Image Slider</span>
+            <span>Homepage Hero Sliders</span>
           </button>
+
           <button
             onClick={() => setActiveTab("news")}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "news" ? "bg-emerald-800 text-white" : "hover:bg-slate-50 text-slate-700"
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "news" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>News & notices</span>
+            <span>News, Notices & Tickers</span>
           </button>
+
           <button
             onClick={() => setActiveTab("team")}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "team" ? "bg-emerald-800 text-white" : "hover:bg-slate-50 text-slate-700"
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "team" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Meet FSU Team</span>
+            <span>FSU Executive Committee</span>
           </button>
+
           <button
             onClick={() => setActiveTab("downloads")}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "downloads" ? "bg-emerald-800 text-white" : "hover:bg-slate-50 text-slate-700"
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "downloads" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
             }`}
           >
             <Download className="w-4 h-4" />
-            <span>Syllabus & notes</span>
+            <span>Syllabus, Notes & Archives</span>
           </button>
+
           <button
             onClick={() => setActiveTab("blogs")}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "blogs" ? "bg-emerald-800 text-white" : "hover:bg-slate-50 text-slate-700"
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "blogs" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
             }`}
           >
             <PenTool className="w-4 h-4" />
-            <span>Student Blogs</span>
+            <span>Student Blogs & Articles</span>
           </button>
+
           <button
             onClick={() => setActiveTab("popup")}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "popup" ? "bg-emerald-800 text-white" : "hover:bg-slate-50 text-slate-700"
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "popup" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
             }`}
           >
-            <AlertOctagon className="w-4 h-4" />
-            <span>Important notice popup</span>
+            <AlertOctagon className="w-4 h-4 text-red-600" />
+            <span>Urgent Popup Modal Notice</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("staff")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "staff" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <Briefcase className="w-4 h-4 text-blue-700" />
+            <span>Campus Staff Directory</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("professors")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "professors" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <GraduationCap className="w-4 h-4 text-purple-700" />
+            <span>Professors & Faculty</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("helpdesk")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "helpdesk" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <HelpCircle className="w-4 h-4 text-emerald-600" />
+            <span>Helpdesk & Hotline Settings</span>
           </button>
         </div>
 
         {/* Tab Content Display */}
-        <div className="lg:col-span-9 bg-white p-6 md:p-8 rounded-3xl shadow-md border border-gray-100 min-h-[500px]">
+        <div className="lg:col-span-9 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 min-h-[550px]">
           
           {/* TAB 1: GENERAL SETTINGS */}
           {activeTab === "general" && (
             <div className="space-y-6">
-              <div className="border-b border-gray-100 pb-4 mb-4 flex justify-between items-center">
-                <h3 className="text-lg font-black text-slate-900">General Titles & Details</h3>
-                <button
-                  onClick={saveGeneralSettings}
-                  disabled={saving}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{saving ? "Saving..." : "Save Settings"}</span>
-                </button>
+              <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-serif font-black text-slate-900">General Portal & Leadership Setup</h3>
+                  <p className="text-xs text-gray-500">Edit core titles, leadership messages, about campus, social links, and legal text.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSaveGeneral("draft")}
+                    disabled={saving}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 border border-slate-300"
+                  >
+                    <Save className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Save Data (Draft)</span>
+                  </button>
+                  <button
+                    onClick={() => handleSaveGeneral("live")}
+                    disabled={saving}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Global Live</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">FSU Title (English)</label>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">FSU Portal Title</label>
                   <input
                     type="text"
                     value={genSettingsForm.titleEn || ""}
                     onChange={(e) => setGenSettingsForm({ ...genSettingsForm, titleEn: e.target.value })}
-                    className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">FSU Title (Nepali)</label>
-                  <input
-                    type="text"
-                    value={genSettingsForm.titleNp || ""}
-                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, titleNp: e.target.value })}
-                    className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">FSU Subtitle (English)</label>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Campus Subtitle / Location</label>
                   <input
                     type="text"
                     value={genSettingsForm.subtitleEn || ""}
                     onChange={(e) => setGenSettingsForm({ ...genSettingsForm, subtitleEn: e.target.value })}
-                    className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">FSU Subtitle (Nepali)</label>
+              </div>
+
+              {/* Logo URL */}
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Official Institutional Logo URL</label>
+                <div className="flex gap-2 items-center">
                   <input
                     type="text"
-                    value={genSettingsForm.subtitleNp || ""}
-                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, subtitleNp: e.target.value })}
-                    className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
+                    value={genSettingsForm.logoUrl || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, logoUrl: e.target.value })}
+                    className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-xs"
+                    placeholder="https://..."
                   />
-                </div>
-              </div>
-
-              {/* Logo upload */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row items-center gap-4">
-                <img
-                  src={genSettingsForm.logoUrl || "placeholder"}
-                  alt="Logo"
-                  className="w-16 h-16 rounded-full object-cover border shadow"
-                />
-                <div className="flex-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
-                    Upload Favicon/Logo (Base64 conversion)
+                  <label className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 border border-slate-200 shrink-0">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, (b64) => setGenSettingsForm({ ...genSettingsForm, logoUrl: b64 }))}
+                    />
                   </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, (b64) => setGenSettingsForm({ ...genSettingsForm, logoUrl: b64 }))}
-                    className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
-                  />
                 </div>
               </div>
 
-              {/* About FSU Text Editors */}
-              <div className="border-t border-gray-100 pt-6 space-y-4">
-                <h4 className="font-bold text-gray-800 text-sm">About FSU Editorial Section</h4>
-                <div className="grid grid-cols-1 gap-4">
+              {/* FSU President Section */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-red-700 uppercase tracking-wider block">FSU President Message & Details</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">FSU About Description (English)</label>
-                    <textarea
-                      rows={4}
-                      value={genSettingsForm.aboutFsuEn || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, aboutFsuEn: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">FSU About Description (Nepali)</label>
-                    <textarea
-                      rows={4}
-                      value={genSettingsForm.aboutFsuNp || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, aboutFsuNp: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                  <div className="w-16 h-12 rounded bg-gray-200 overflow-hidden shrink-0">
-                    <img src={genSettingsForm.aboutFsuImg} alt="FSU Img" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Upload FSU Editorial Image</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, (b64) => setGenSettingsForm({ ...genSettingsForm, aboutFsuImg: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* About Campus Text Editors */}
-              <div className="border-t border-gray-100 pt-6 space-y-4">
-                <h4 className="font-bold text-gray-800 text-sm">About Campus Description Section</h4>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Campus Description (English)</label>
-                    <textarea
-                      rows={4}
-                      value={genSettingsForm.aboutCampusEn || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, aboutCampusEn: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Campus Description (Nepali)</label>
-                    <textarea
-                      rows={4}
-                      value={genSettingsForm.aboutCampusNp || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, aboutCampusNp: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                  <div className="w-16 h-12 rounded bg-gray-200 overflow-hidden shrink-0">
-                    <img src={genSettingsForm.aboutCampusImg} alt="Campus Img" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Upload Campus Institution Image</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, (b64) => setGenSettingsForm({ ...genSettingsForm, aboutCampusImg: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Message from FSU President */}
-              <div className="border-t border-gray-100 pt-6 space-y-4">
-                <h4 className="font-bold text-gray-800 text-sm">Message From FSU President</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">President Name (English)</label>
+                    <label className="text-[11px] font-semibold text-gray-600 block mb-1">President Full Name</label>
                     <input
                       type="text"
                       value={genSettingsForm.presidentNameEn || ""}
                       onChange={(e) => setGenSettingsForm({ ...genSettingsForm, presidentNameEn: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">President Name (Nepali)</label>
+                    <label className="text-[11px] font-semibold text-gray-600 block mb-1">President Photo URL</label>
                     <input
                       type="text"
-                      value={genSettingsForm.presidentNameNp || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, presidentNameNp: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
+                      value={genSettingsForm.presidentPhoto || ""}
+                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, presidentPhoto: e.target.value })}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">President Message (English)</label>
-                    <textarea
-                      rows={4}
-                      value={genSettingsForm.presidentMessageEn || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, presidentMessageEn: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">President Message (Nepali)</label>
-                    <textarea
-                      rows={4}
-                      value={genSettingsForm.presidentMessageNp || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, presidentMessageNp: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                  <img src={genSettingsForm.presidentPhoto} alt="President" className="w-12 h-12 rounded-full object-cover border shadow" />
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">President Photo (Circle)</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, (b64) => setGenSettingsForm({ ...genSettingsForm, presidentPhoto: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
-                    />
-                  </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-600 block mb-1">President Official Message</label>
+                  <textarea
+                    rows={3}
+                    value={genSettingsForm.presidentMessageEn || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, presidentMessageEn: e.target.value })}
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
+                  />
                 </div>
               </div>
 
-              {/* Message from Campus Chief */}
-              <div className="border-t border-gray-100 pt-6 space-y-4">
-                <h4 className="font-bold text-gray-800 text-sm">Message From Campus Chief</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Campus Chief Section */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-blue-900 uppercase tracking-wider block">Campus Chief Message & Details</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Campus Chief Name (English)</label>
+                    <label className="text-[11px] font-semibold text-gray-600 block mb-1">Campus Chief Full Name & Title</label>
                     <input
                       type="text"
                       value={genSettingsForm.chiefNameEn || ""}
                       onChange={(e) => setGenSettingsForm({ ...genSettingsForm, chiefNameEn: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Campus Chief Name (Nepali)</label>
+                    <label className="text-[11px] font-semibold text-gray-600 block mb-1">Chief Photo URL</label>
                     <input
                       type="text"
-                      value={genSettingsForm.chiefNameNp || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, chiefNameNp: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
+                      value={genSettingsForm.chiefPhoto || ""}
+                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, chiefPhoto: e.target.value })}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Chief Message (English)</label>
-                    <textarea
-                      rows={4}
-                      value={genSettingsForm.chiefMessageEn || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, chiefMessageEn: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Chief Message (Nepali)</label>
-                    <textarea
-                      rows={4}
-                      value={genSettingsForm.chiefMessageNp || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, chiefMessageNp: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                  <img src={genSettingsForm.chiefPhoto} alt="Chief" className="w-12 h-12 rounded-full object-cover border shadow" />
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Campus Chief Photo (Circle)</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, (b64) => setGenSettingsForm({ ...genSettingsForm, chiefPhoto: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
-                    />
-                  </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-600 block mb-1">Campus Chief Official Message</label>
+                  <textarea
+                    rows={3}
+                    value={genSettingsForm.chiefMessageEn || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, chiefMessageEn: e.target.value })}
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
+                  />
                 </div>
               </div>
 
-              {/* Social embeds */}
-              <div className="border-t border-gray-100 pt-6 space-y-4">
-                <h4 className="font-bold text-gray-800 text-sm">Social Embed URLs</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Campus Facebook Page Link</label>
-                    <input
-                      type="text"
-                      value={genSettingsForm.fbCampusPage || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, fbCampusPage: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">FSU Facebook Page Link</label>
-                    <input
-                      type="text"
-                      value={genSettingsForm.fbFsuPage || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, fbFsuPage: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
+              {/* About FSU & About Campus */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">About FSU Overview</label>
+                  <textarea
+                    rows={4}
+                    value={genSettingsForm.aboutFsuEn || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, aboutFsuEn: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">About Darchula Multiple Campus</label>
+                  <textarea
+                    rows={4}
+                    value={genSettingsForm.aboutCampusEn || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, aboutCampusEn: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                  />
                 </div>
               </div>
 
-              {/* Legal footer */}
-              <div className="border-t border-gray-100 pt-6 space-y-4">
-                <h4 className="font-bold text-gray-800 text-sm">Terms & Privacy Content</h4>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Privacy Policy (English)</label>
-                    <textarea
-                      rows={3}
-                      value={genSettingsForm.privacyPolicyEn || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, privacyPolicyEn: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Privacy Policy (Nepali)</label>
-                    <textarea
-                      rows={3}
-                      value={genSettingsForm.privacyPolicyNp || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, privacyPolicyNp: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Terms & Conditions (English)</label>
-                    <textarea
-                      rows={3}
-                      value={genSettingsForm.termsEn || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, termsEn: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Terms & Conditions (Nepali)</label>
-                    <textarea
-                      rows={3}
-                      value={genSettingsForm.termsNp || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, termsNp: e.target.value })}
-                      className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
+              {/* Social Pages & Affiliation Links */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Campus Facebook Page</label>
+                  <input
+                    type="text"
+                    value={genSettingsForm.fbCampusPage || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, fbCampusPage: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                    placeholder="https://facebook.com/..."
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">FSU Facebook Page</label>
+                  <input
+                    type="text"
+                    value={genSettingsForm.fbFsuPage || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, fbFsuPage: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                    placeholder="https://facebook.com/..."
+                  />
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-6 flex justify-end">
-                <button
-                  onClick={saveGeneralSettings}
-                  disabled={saving}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition flex items-center gap-1 shadow-md"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{saving ? "Saving Changes..." : "Save All General Settings"}</span>
-                </button>
+              {/* Legal: Privacy Policy & Terms */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Privacy Policy Text</label>
+                  <textarea
+                    rows={3}
+                    value={genSettingsForm.privacyPolicyEn || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, privacyPolicyEn: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Terms & Conditions Text</label>
+                  <textarea
+                    rows={3}
+                    value={genSettingsForm.termsEn || ""}
+                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, termsEn: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: SLIDER ITEMS */}
+          {/* TAB 2: SLIDES */}
           {activeTab === "slides" && (
             <div className="space-y-6">
-              <h3 className="text-lg font-black text-slate-900 border-b border-gray-100 pb-3">
-                Manage Home Photo Slider
-              </h3>
-
-              {/* Add form */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">Upload New Slide Photo</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Caption Title (English)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Campus Football Ground Tournament"
-                      value={newSlide.titleEn}
-                      onChange={(e) => setNewSlide({ ...newSlide, titleEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Caption Title (Nepali)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. खेलकुद मैदान"
-                      value={newSlide.titleNp}
-                      onChange={(e) => setNewSlide({ ...newSlide, titleNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-                  <div className="w-24 h-16 bg-gray-100 border rounded flex items-center justify-center shrink-0">
-                    {newSlide.imageUrl ? (
-                      <img src={newSlide.imageUrl} alt="preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <Upload className="w-6 h-6 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, (b64) => setNewSlide({ ...newSlide, imageUrl: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
-                    />
-                  </div>
-                  <button
-                    onClick={addSlide}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Upload Slide</span>
-                  </button>
-                </div>
+              <div className="border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-serif font-black text-slate-900">Homepage Hero Image Slider</h3>
+                <p className="text-xs text-gray-500">Add, view, and delete full-width carousel banners on the homepage.</p>
               </div>
 
-              {/* Slides lists */}
-              <div className="space-y-3">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Active Slides List</span>
-                {slides.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic">No slides uploaded yet.</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {slides.map((slide) => (
-                      <div key={slide.id} className="p-3 border border-gray-100 rounded-2xl flex gap-3 items-center justify-between">
-                        <img src={slide.imageUrl} alt="slide" className="w-20 h-14 object-cover rounded-lg shadow-sm" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm text-gray-900 truncate">{slide.titleEn}</p>
-                          <p className="text-xs text-gray-500 truncate">{slide.titleNp}</p>
-                        </div>
-                        <button
-                          onClick={() => deleteItem("slides", slide.id)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition shrink-0"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+              {/* Add slide form */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add New Banner Slide</span>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Banner Slide Caption</label>
+                  <input
+                    type="text"
+                    value={newSlide.titleEn}
+                    onChange={(e) => setNewSlide({ ...newSlide, titleEn: e.target.value })}
+                    placeholder="Welcome to Darchula Multiple Campus FSU"
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Slide Image URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSlide.imageUrl}
+                      onChange={(e) => setNewSlide({ ...newSlide, imageUrl: e.target.value })}
+                      placeholder="https://images.unsplash.com/..."
+                      className="flex-1 p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, (b64) => setNewSlide({ ...newSlide, imageUrl: b64 }))}
+                      />
+                    </label>
                   </div>
-                )}
+                </div>
+                <button
+                  onClick={addSlide}
+                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Publish Slide Live</span>
+                </button>
+              </div>
+
+              {/* Existing Slides List */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {slides.map((s) => (
+                  <div key={s.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <img src={s.imageUrl} alt={s.titleEn} className="w-full h-32 object-cover rounded-xl mb-2" />
+                      <h4 className="font-bold text-sm text-slate-900">{s.titleEn}</h4>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-slate-100 flex justify-end">
+                      <button
+                        onClick={() => deleteItem("slides", s.id)}
+                        className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 3: RECENT NEWS & NOTICES */}
+          {/* TAB 3: NEWS & NOTICES */}
           {activeTab === "news" && (
             <div className="space-y-6">
-              <h3 className="text-lg font-black text-slate-900 border-b border-gray-100 pb-3">
-                Publish News and Notices
-              </h3>
-
-              {/* Add News */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">Write Announcement Notice</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Heading Title (English)</label>
-                    <input
-                      type="text"
-                      value={newNews.headingEn}
-                      onChange={(e) => setNewNews({ ...newNews, headingEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Heading Title (Nepali)</label>
-                    <input
-                      type="text"
-                      value={newNews.headingNp}
-                      onChange={(e) => setNewNews({ ...newNews, headingNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Body Context (English)</label>
-                    <textarea
-                      rows={3}
-                      value={newNews.bodyEn}
-                      onChange={(e) => setNewNews({ ...newNews, bodyEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Body Context (Nepali)</label>
-                    <textarea
-                      rows={3}
-                      value={newNews.bodyNp}
-                      onChange={(e) => setNewNews({ ...newNews, bodyNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-                  <div className="w-16 h-12 bg-gray-100 border rounded flex items-center justify-center shrink-0">
-                    {newNews.imageUrl ? (
-                      <img src={newNews.imageUrl} alt="preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <Upload className="w-5 h-5 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] text-gray-400 block mb-1 font-bold uppercase">Optional Attachment Photo</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, (b64) => setNewNews({ ...newNews, imageUrl: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
-                    />
-                  </div>
-                  <button
-                    onClick={addNews}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Publish Announcement</span>
-                  </button>
-                </div>
+              <div className="border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-serif font-black text-slate-900">News, Announcements & Tickers</h3>
+                <p className="text-xs text-gray-500">Publish urgent notices, exam schedules, and institutional campus updates.</p>
               </div>
 
-              {/* News list */}
-              <div className="space-y-3">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Published Notices</span>
-                <div className="space-y-3">
-                  {news.map((item) => (
-                    <div key={item.id} className="p-4 border border-gray-100 rounded-2xl flex items-start gap-4 justify-between">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[10px] text-gray-400 font-mono">{new Date(item.createdAt).toLocaleString()}</span>
-                        <h5 className="font-extrabold text-sm text-gray-900 mt-0.5">{item.headingEn}</h5>
-                        <p className="text-xs text-gray-500 line-clamp-1 mt-1">{item.bodyEn}</p>
-                      </div>
-                      <button
-                        onClick={() => deleteItem("news", item.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+              {/* Add News */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Publish New Announcement</span>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">News Headline</label>
+                  <input
+                    type="text"
+                    value={newNews.headingEn}
+                    onChange={(e) => setNewNews({ ...newNews, headingEn: e.target.value })}
+                    placeholder="BBS / B.Ed Exam Center Published"
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
+                  />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Announcement Body Text</label>
+                  <textarea
+                    rows={3}
+                    value={newNews.bodyEn}
+                    onChange={(e) => setNewNews({ ...newNews, bodyEn: e.target.value })}
+                    placeholder="Full announcement details..."
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Optional Feature Image URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newNews.imageUrl}
+                      onChange={(e) => setNewNews({ ...newNews, imageUrl: e.target.value })}
+                      placeholder="https://..."
+                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, (b64) => setNewNews({ ...newNews, imageUrl: b64 }))}
+                      />
+                    </label>
+                  </div>
+                </div>
+                <button
+                  onClick={addNews}
+                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Publish Notice Live</span>
+                </button>
+              </div>
+
+              {/* List */}
+              <div className="space-y-3">
+                {news.map((item) => (
+                  <div key={item.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900">{item.headingEn}</h4>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{item.bodyEn}</p>
+                      <span className="text-[10px] text-slate-400 font-mono mt-2 block">
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => deleteItem("news", item.id)}
+                      className="p-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -1036,112 +1213,96 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
           {/* TAB 4: MEET FSU TEAM */}
           {activeTab === "team" && (
             <div className="space-y-6">
-              <h3 className="text-lg font-black text-slate-900 border-b border-gray-100 pb-3">
-                FSU Committee Name Cards (Max 30)
-              </h3>
+              <div className="border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-serif font-black text-slate-900">FSU Executive Committee</h3>
+                <p className="text-xs text-gray-500">Manage elected student union representatives and executive board members.</p>
+              </div>
 
-              {/* Add form */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">Create Team Member Card</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add Representative Card</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Member Name (English)</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Representative Name</label>
                     <input
                       type="text"
                       value={newMember.nameEn}
                       onChange={(e) => setNewMember({ ...newMember, nameEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      placeholder="e.g., Amit Joshi"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Member Name (Nepali)</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">FSU Position / Role</label>
                     <input
                       type="text"
-                      value={newMember.nameNp}
-                      onChange={(e) => setNewMember({ ...newMember, nameNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Role (English)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Joint Secretary"
                       value={newMember.roleEn}
                       onChange={(e) => setNewMember({ ...newMember, roleEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      placeholder="e.g., FSU President"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Role (Nepali)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. सह-सचिव"
-                      value={newMember.roleNp}
-                      onChange={(e) => setNewMember({ ...newMember, roleNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Priority Order (1=President, 2=VP, etc.)</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Order Index (1 = President)</label>
                     <input
                       type="number"
-                      min="1"
-                      max="30"
                       value={newMember.order}
                       onChange={(e) => setNewMember({ ...newMember, order: Number(e.target.value) })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
                     />
                   </div>
                 </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-                  <div className="w-16 h-16 bg-gray-100 border rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                    {newMember.imageUrl ? (
-                      <img src={newMember.imageUrl} alt="preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <Users className="w-6 h-6 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] text-gray-400 block mb-1 font-bold uppercase">Circle Profile Photo</label>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Photo URL</label>
+                  <div className="flex gap-2">
                     <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, (b64) => setNewMember({ ...newMember, imageUrl: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
+                      type="text"
+                      value={newMember.imageUrl}
+                      onChange={(e) => setNewMember({ ...newMember, imageUrl: e.target.value })}
+                      placeholder="https://..."
+                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
                     />
+                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, (b64) => setNewMember({ ...newMember, imageUrl: b64 }))}
+                      />
+                    </label>
                   </div>
-                  <button
-                    onClick={addMember}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Create Card</span>
-                  </button>
                 </div>
+                <button
+                  onClick={addMember}
+                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Team Member Live</span>
+                </button>
               </div>
 
-              {/* Members grid list */}
-              <div className="space-y-3">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Active FSU Members ({team.length}/30)</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {team.map((member) => (
-                    <div key={member.id} className="p-3 border border-gray-100 rounded-2xl flex items-center justify-between gap-3">
-                      <img src={member.imageUrl} alt={member.nameEn} className="w-12 h-12 rounded-full object-cover border" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-extrabold text-sm text-gray-900 truncate">{member.nameEn} ({member.order})</p>
-                        <p className="text-xs text-gray-500 truncate">{member.roleEn}</p>
+              {/* Committee grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {team.sort((a, b) => a.order - b.order).map((m) => (
+                  <div key={m.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <img src={m.imageUrl} alt={m.nameEn} className="w-12 h-12 rounded-full object-cover border border-slate-200" />
+                      <div>
+                        <h4 className="font-bold text-xs text-slate-900">{m.nameEn}</h4>
+                        <span className="text-[10px] text-red-700 font-bold block">{m.roleEn}</span>
+                        <span className="text-[9px] text-slate-400 font-mono">Order: #{m.order}</span>
                       </div>
-                      <button
-                        onClick={() => deleteItem("team", member.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
-                  ))}
-                </div>
+                    <button
+                      onClick={() => deleteItem("team", m.id)}
+                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -1149,356 +1310,583 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
           {/* TAB 5: SYLLABUS & DOWNLOADS */}
           {activeTab === "downloads" && (
             <div className="space-y-6">
-              <h3 className="text-lg font-black text-slate-900 border-b border-gray-100 pb-3">
-                Syllabus & notes files
-              </h3>
-
-              {/* Add form */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">Add New File Resource</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Document Title (English)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. BBS 1st Year Syllabus"
-                      value={newDownload.titleEn}
-                      onChange={(e) => setNewDownload({ ...newDownload, titleEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Document Title (Nepali)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. बिबिएस प्रथम वर्ष"
-                      value={newDownload.titleNp}
-                      onChange={(e) => setNewDownload({ ...newDownload, titleNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Google Drive URL or PDF base64 Link</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. https://drive.google.com/..."
-                      value={newDownload.fileUrl}
-                      onChange={(e) => setNewDownload({ ...newDownload, fileUrl: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="isDriveLink"
-                      checked={newDownload.isDriveLink}
-                      onChange={(e) => setNewDownload({ ...newDownload, isDriveLink: e.target.checked })}
-                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded"
-                    />
-                    <label htmlFor="isDriveLink" className="text-xs font-bold text-gray-600">
-                      Is this a Google Drive link?
-                    </label>
-                  </div>
-                  <button
-                    onClick={addDownload}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add File</span>
-                  </button>
-                </div>
+              <div className="border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-serif font-black text-slate-900">Syllabus, Notes & Downloads</h3>
+                <p className="text-xs text-gray-500">Provide academic curriculum, notes, and Google Drive resource links.</p>
               </div>
 
-              {/* Downloads list */}
-              <div className="space-y-3">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Active Downloads</span>
-                <div className="space-y-2">
-                  {downloads.map((item) => (
-                    <div key={item.id} className="p-3 border border-gray-100 rounded-2xl flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-extrabold text-sm text-gray-900 truncate">{item.titleEn}</p>
-                        <p className="text-[10px] text-gray-400 truncate">{item.fileUrl}</p>
-                      </div>
-                      <button
-                        onClick={() => deleteItem("downloads", item.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add Document / Notes Link</span>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Document Title</label>
+                  <input
+                    type="text"
+                    value={newDownload.titleEn}
+                    onChange={(e) => setNewDownload({ ...newDownload, titleEn: e.target.value })}
+                    placeholder="BBS 1st Year Complete Notes"
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
+                  />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Direct Download URL or Google Drive Link</label>
+                  <input
+                    type="text"
+                    value={newDownload.fileUrl}
+                    onChange={(e) => setNewDownload({ ...newDownload, fileUrl: e.target.value })}
+                    placeholder="https://drive.google.com/..."
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                  />
+                </div>
+                <button
+                  onClick={addDownload}
+                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Resource Live</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {downloads.map((d) => (
+                  <div key={d.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900">{d.titleEn}</h4>
+                      <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-blue-900 underline font-mono flex items-center gap-1 mt-0.5">
+                        <ExternalLink className="w-3 h-3" />
+                        <span className="truncate max-w-sm">{d.fileUrl}</span>
+                      </a>
+                    </div>
+                    <button
+                      onClick={() => deleteItem("downloads", d.id)}
+                      className="p-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 6: STUDENT BLOGS */}
+          {/* TAB 6: BLOGS */}
           {activeTab === "blogs" && (
             <div className="space-y-6">
-              <h3 className="text-lg font-black text-slate-900 border-b border-gray-100 pb-3">
-                Student Blog & Articles
-              </h3>
+              <div className="border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-serif font-black text-slate-900">Student Blogs & Articles</h3>
+                <p className="text-xs text-gray-500">Publish articles, essays, and opinion pieces authored by campus students.</p>
+              </div>
 
-              {/* Add form */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">Write Blog Post</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add New Student Blog</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Article Title (English)</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Article Heading</label>
                     <input
                       type="text"
                       value={newBlog.headingEn}
                       onChange={(e) => setNewBlog({ ...newBlog, headingEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      placeholder="Title of the article"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Article Title (Nepali)</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Author Name & Class</label>
                     <input
                       type="text"
-                      value={newBlog.headingNp}
-                      onChange={(e) => setNewBlog({ ...newBlog, headingNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Author Name (English)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Amit Joshi, BBS 3rd"
                       value={newBlog.authorEn}
                       onChange={(e) => setNewBlog({ ...newBlog, authorEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Author Name (Nepali)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. अमित जोशी, बिबिएस तेस्रो"
-                      value={newBlog.authorNp}
-                      onChange={(e) => setNewBlog({ ...newBlog, authorNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Full Story (English)</label>
-                    <textarea
-                      rows={4}
-                      value={newBlog.bodyEn}
-                      onChange={(e) => setNewBlog({ ...newBlog, bodyEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Full Story (Nepali)</label>
-                    <textarea
-                      rows={4}
-                      value={newBlog.bodyNp}
-                      onChange={(e) => setNewBlog({ ...newBlog, bodyNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                      placeholder="e.g., Amit Joshi, BBS 3rd Year"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
                     />
                   </div>
                 </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-                  <div className="w-16 h-12 bg-gray-100 border rounded flex items-center justify-center shrink-0">
-                    {newBlog.imageUrl ? (
-                      <img src={newBlog.imageUrl} alt="preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <Upload className="w-5 h-5 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] text-gray-400 block mb-1 font-bold uppercase">Blog Hero Photo</label>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Article Body Content</label>
+                  <textarea
+                    rows={4}
+                    value={newBlog.bodyEn}
+                    onChange={(e) => setNewBlog({ ...newBlog, bodyEn: e.target.value })}
+                    placeholder="Full article content..."
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Header Image URL</label>
+                  <div className="flex gap-2">
                     <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, (b64) => setNewBlog({ ...newBlog, imageUrl: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
+                      type="text"
+                      value={newBlog.imageUrl}
+                      onChange={(e) => setNewBlog({ ...newBlog, imageUrl: e.target.value })}
+                      placeholder="https://..."
+                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
                     />
+                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, (b64) => setNewBlog({ ...newBlog, imageUrl: b64 }))}
+                      />
+                    </label>
                   </div>
+                </div>
+                <button
+                  onClick={addBlog}
+                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Publish Blog Live</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {blogs.map((b) => (
+                  <div key={b.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900">{b.headingEn}</h4>
+                      <span className="text-[11px] text-red-700 font-bold block mt-0.5">Author: {b.authorEn}</span>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{b.bodyEn}</p>
+                    </div>
+                    <button
+                      onClick={() => deleteItem("blogs", b.id)}
+                      className="p-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: POPUP NOTICE */}
+          {activeTab === "popup" && (
+            <div className="space-y-6">
+              <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-serif font-black text-slate-900">Urgent Popup Notice Modal</h3>
+                  <p className="text-xs text-gray-500">Configure modal alert that pops up when visitors land on the portal.</p>
+                </div>
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={addBlog}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                    onClick={() => handleSaveImportantNotice("draft")}
+                    disabled={saving}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 border border-slate-300"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Publish Blog</span>
+                    <Save className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Save Data (Draft)</span>
+                  </button>
+                  <button
+                    onClick={() => handleSaveImportantNotice("live")}
+                    disabled={saving}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Global Live</span>
                   </button>
                 </div>
               </div>
 
-              {/* Blogs list */}
-              <div className="space-y-3">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Active Blogs</span>
-                <div className="space-y-3">
-                  {blogs.map((item) => (
-                    <div key={item.id} className="p-3 border border-gray-100 rounded-2xl flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-extrabold text-sm text-gray-900 truncate">{item.headingEn}</p>
-                        <p className="text-xs text-gray-400 truncate">By: {item.authorEn}</p>
-                      </div>
-                      <button
-                        onClick={() => deleteItem("blogs", item.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+              {/* Toggle active */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900">Enable Urgent Popup Alert</h4>
+                  <p className="text-xs text-slate-500">When enabled, visitors will see this modal immediately on page load.</p>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 7: IMPORTANT NOTICE POPUP */}
-          {activeTab === "popup" && (
-            <div className="space-y-6">
-              <div className="border-b border-gray-100 pb-4 mb-4 flex justify-between items-center">
-                <h3 className="text-lg font-black text-slate-900">Configure Important Popup Announcement</h3>
                 <button
-                  onClick={saveImportantNotice}
-                  disabled={saving}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                  type="button"
+                  onClick={() => setImportantNoticeForm({ ...importantNoticeForm, active: !importantNoticeForm.active })}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+                    importantNoticeForm.active ? "bg-red-700 text-white" : "bg-slate-200 text-slate-700"
+                  }`}
                 >
-                  <Save className="w-4 h-4" />
-                  <span>{saving ? "Saving..." : "Save Announcement"}</span>
+                  {importantNoticeForm.active ? "POPUP IS ACTIVE" : "POPUP IS DISABLED"}
                 </button>
               </div>
 
-              <div className="space-y-4">
-                {/* Active Toggle */}
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-bold text-gray-900 block">Enable Notice Popup on load</label>
-                    <span className="text-[10px] text-gray-400 block font-sans">
-                      Toggle whether visitors immediately see this overlay when loading the homepage
-                    </span>
-                  </div>
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Top Ticker Banner Text</label>
+                <input
+                  type="text"
+                  value={importantNoticeForm.bannerTextEn || ""}
+                  onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, bannerTextEn: e.target.value })}
+                  placeholder="e.g., URGENT: FSU Helpdesk Admission Counters Open"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Popup Modal Title</label>
+                <input
+                  type="text"
+                  value={importantNoticeForm.titleEn || ""}
+                  onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, titleEn: e.target.value })}
+                  placeholder="Modal Title"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Popup Modal Detailed Message</label>
+                <textarea
+                  rows={4}
+                  value={importantNoticeForm.bodyEn || ""}
+                  onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, bodyEn: e.target.value })}
+                  placeholder="Detailed instructions for students..."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Modal Flyer / Image URL</label>
+                <div className="flex gap-2">
                   <input
-                    type="checkbox"
-                    checked={importantNoticeForm.active || false}
-                    onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, active: e.target.checked })}
-                    className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    type="text"
+                    value={importantNoticeForm.imageUrl || ""}
+                    onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, imageUrl: e.target.value })}
+                    placeholder="https://..."
+                    className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
                   />
-                </div>
-
-                {/* Display Type */}
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Notice Display Format</label>
-                  <select
-                    value={importantNoticeForm.type || "both"}
-                    onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, type: e.target.value as any })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
-                  >
-                    <option value="both">Both (A4 Image + Context Description)</option>
-                    <option value="image">A4 Image Only</option>
-                    <option value="text">Text Only</option>
-                  </select>
-                </div>
-
-                {/* Banner Customization */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Banner / Top Tagline (English)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. ⚠️ CRITICAL CAMPUS ANNOUNCEMENT"
-                      value={importantNoticeForm.bannerTextEn || ""}
-                      onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, bannerTextEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Banner / Top Tagline (Nepali)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. ⚠️ स्वतन्त्र विद्यार्थी युनियन विशेष सूचना"
-                      value={importantNoticeForm.bannerTextNp || ""}
-                      onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, bannerTextNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Titles */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Notice Header (English)</label>
-                    <input
-                      type="text"
-                      value={importantNoticeForm.titleEn || ""}
-                      onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, titleEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Notice Header (Nepali)</label>
-                    <input
-                      type="text"
-                      value={importantNoticeForm.titleNp || ""}
-                      onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, titleNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Bodies */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Notice Context Body (English)</label>
-                    <textarea
-                      rows={4}
-                      value={importantNoticeForm.bodyEn || ""}
-                      onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, bodyEn: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Notice Context Body (Nepali)</label>
-                    <textarea
-                      rows={4}
-                      value={importantNoticeForm.bodyNp || ""}
-                      onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, bodyNp: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* A4 Image attachment */}
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                  <div className="w-16 h-20 bg-gray-200 overflow-hidden shrink-0 border rounded">
-                    {importantNoticeForm.imageUrl && (
-                      <img src={importantNoticeForm.imageUrl} alt="notice" className="w-full h-full object-cover" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Upload Notice Image (A4 Format)</label>
+                  <label className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 border border-slate-200 shrink-0">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Flyer</span>
                     <input
                       type="file"
                       accept="image/*"
+                      className="hidden"
                       onChange={(e) => handleFileUpload(e, (b64) => setImportantNoticeForm({ ...importantNoticeForm, imageUrl: b64 }))}
-                      className="text-xs text-gray-500 cursor-pointer"
                     />
-                  </div>
+                  </label>
                 </div>
-              </div>
-
-              <div className="border-t border-gray-100 pt-6 flex justify-end">
-                <button
-                  onClick={saveImportantNotice}
-                  disabled={saving}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition flex items-center gap-1 shadow-md"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{saving ? "Saving Notice..." : "Save Announcement Setting"}</span>
-                </button>
               </div>
             </div>
           )}
+
+          {/* TAB 8: CAMPUS STAFF DIRECTORY */}
+          {activeTab === "staff" && (
+            <div className="space-y-6">
+              <div className="border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-serif font-black text-slate-900">Campus Staff Directory</h3>
+                <p className="text-xs text-gray-500">Manage administrative, examination, finance, and library staff members.</p>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add New Staff Member</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={newStaff.name}
+                      onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
+                      placeholder="e.g., Janak Raj Pant"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Designation</label>
+                    <input
+                      type="text"
+                      value={newStaff.designation}
+                      onChange={(e) => setNewStaff({ ...newStaff, designation: e.target.value })}
+                      placeholder="e.g., Campus Administrator"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Department</label>
+                    <select
+                      value={newStaff.department}
+                      onChange={(e) => setNewStaff({ ...newStaff, department: e.target.value })}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    >
+                      <option value="Administration">Administration</option>
+                      <option value="Examination & Evaluation">Examination & Evaluation</option>
+                      <option value="Finance & Accounts">Finance & Accounts</option>
+                      <option value="Library & Information Center">Library & Information Center</option>
+                      <option value="ICT & Technical Support">ICT & Technical Support</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Official Email</label>
+                    <input
+                      type="email"
+                      value={newStaff.email}
+                      onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+                      placeholder="admin@fsudmc.com"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Contact Phone</label>
+                    <input
+                      type="text"
+                      value={newStaff.phone}
+                      onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
+                      placeholder="+977-9848712345"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Office Room</label>
+                    <input
+                      type="text"
+                      value={newStaff.office}
+                      onChange={(e) => setNewStaff({ ...newStaff, office: e.target.value })}
+                      placeholder="Main Admin Block, Room 101"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Photo URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newStaff.imageUrl}
+                      onChange={(e) => setNewStaff({ ...newStaff, imageUrl: e.target.value })}
+                      placeholder="https://..."
+                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, (b64) => setNewStaff({ ...newStaff, imageUrl: b64 }))}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  onClick={addStaff}
+                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Staff Member Live</span>
+                </button>
+              </div>
+
+              {/* Staff List */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {staff.map((s) => (
+                  <div key={s.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <img src={s.imageUrl || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200"} alt={s.name} className="w-12 h-12 rounded-xl object-cover border" />
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900">{s.name}</h4>
+                        <span className="text-xs text-blue-900 font-bold block">{s.designation}</span>
+                        <span className="text-[11px] text-slate-500 block">{s.department}</span>
+                        <span className="text-[10px] text-slate-400 font-mono block mt-1">{s.email} &bull; {s.phone}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => deleteItem("staff", s.id)}
+                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 9: PROFESSORS & FACULTY */}
+          {activeTab === "professors" && (
+            <div className="space-y-6">
+              <div className="border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-serif font-black text-slate-900">Professors & Academic Faculty</h3>
+                <p className="text-xs text-gray-500">Manage academic professors, lecturers, and heads of departments.</p>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add Faculty Member</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Full Name with Prefix</label>
+                    <input
+                      type="text"
+                      value={newProf.name}
+                      onChange={(e) => setNewProf({ ...newProf, name: e.target.value })}
+                      placeholder="e.g., Assoc. Prof. Dr. Dinesh Bhatt"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Academic Title</label>
+                    <input
+                      type="text"
+                      value={newProf.title}
+                      onChange={(e) => setNewProf({ ...newProf, title: e.target.value })}
+                      placeholder="Campus Chief & Associate Professor"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Faculty Stream</label>
+                    <select
+                      value={newProf.faculty}
+                      onChange={(e) => setNewProf({ ...newProf, faculty: e.target.value })}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    >
+                      <option value="Faculty of Management">Faculty of Management</option>
+                      <option value="Faculty of Education">Faculty of Education</option>
+                      <option value="Faculty of Humanities & Social Sciences">Faculty of Humanities & Social Sciences</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Department</label>
+                    <input
+                      type="text"
+                      value={newProf.department}
+                      onChange={(e) => setNewProf({ ...newProf, department: e.target.value })}
+                      placeholder="Business Administration"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Qualification</label>
+                    <input
+                      type="text"
+                      value={newProf.qualification}
+                      onChange={(e) => setNewProf({ ...newProf, qualification: e.target.value })}
+                      placeholder="Ph.D. in Management, M.Phil"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Subjects (Comma-separated)</label>
+                    <input
+                      type="text"
+                      value={profSubjectsInput}
+                      onChange={(e) => setProfSubjectsInput(e.target.value)}
+                      placeholder="Strategic Management, Research Methods"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Photo URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newProf.imageUrl}
+                      onChange={(e) => setNewProf({ ...newProf, imageUrl: e.target.value })}
+                      placeholder="https://..."
+                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, (b64) => setNewProf({ ...newProf, imageUrl: b64 }))}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  onClick={addProfessor}
+                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Professor Live</span>
+                </button>
+              </div>
+
+              {/* Professor List */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {professors.map((p) => (
+                  <div key={p.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <img src={p.imageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200"} alt={p.name} className="w-12 h-12 rounded-xl object-cover border" />
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900">{p.name}</h4>
+                        <span className="text-xs text-purple-900 font-bold block">{p.title}</span>
+                        <span className="text-[11px] text-slate-500 block">{p.faculty} &bull; {p.department}</span>
+                        <span className="text-[10px] text-slate-400 font-mono block mt-1">{p.qualification}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => deleteItem("professors", p.id)}
+                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 10: HELPDESK & EMERGENCY HOTLINE SETTINGS */}
+          {activeTab === "helpdesk" && (
+            <div className="space-y-6">
+              <div className="border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-serif font-black text-slate-900">Helpdesk & Emergency Hotline Console</h3>
+                <p className="text-xs text-gray-500">Quickly review incoming tickets, manage emergency numbers, and student support configurations.</p>
+              </div>
+
+              <div className="p-6 bg-gradient-to-br from-blue-950 to-slate-900 rounded-3xl text-white space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-600/80 text-xs font-bold uppercase tracking-wider text-white">
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-300" />
+                  Live Helpdesk Channel
+                </div>
+                <h4 className="text-xl font-serif font-black text-white">
+                  Student Helpdesk & Grievance Tickets
+                </h4>
+                <p className="text-xs text-blue-200/90 leading-relaxed max-w-xl">
+                  Incoming tickets submitted by students for admissions, exam center queries, scholarship counseling, and grievance redressal are stored securely in the Helpdesk Inbox.
+                </p>
+
+                <div className="pt-2">
+                  <button
+                    onClick={onGoMessages}
+                    className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-red-950/40"
+                  >
+                    <Inbox className="w-4 h-4" />
+                    <span>Open Helpdesk Messages Tab (https://www.fsudmc.com/#messages)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Emergency Helpline</span>
+                  <p className="text-sm font-bold text-slate-900">+977-9848712345</p>
+                  <span className="text-[11px] text-slate-500">Available 24/7 for urgent assistance</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Official Email</span>
+                  <p className="text-sm font-bold text-slate-900">info@fsudmc.com</p>
+                  <span className="text-[11px] text-slate-500">Secretariat correspondence</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Physical Desk</span>
+                  <p className="text-sm font-bold text-slate-900">FSU Secretariat Office</p>
+                  <span className="text-[11px] text-slate-500">Khalanga, Darchula Multiple Campus</span>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

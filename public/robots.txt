@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /campuslogin
+Disallow: /databasemessage2083
+Disallow: /messages
+
+Sitemap: https://www.fsudmc.com/sitemap.xml
+Sitemap: https://fsudmc.com/sitemap.xml
