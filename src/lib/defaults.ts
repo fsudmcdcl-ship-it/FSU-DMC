@@ -28,7 +28,12 @@ export const DEFAULT_DB_STATE: DatabaseState = {
     privacyPolicyEn: "This Privacy Policy governs the manner in which the Free Student Union - DMC Portal collects, uses, maintains and discloses information collected from users. Your privacy is extremely important to us, and any data submitted via the anonymous or standard contact form is securely stored with restricted, authenticated administration access.",
     privacyPolicyNp: "This Privacy Policy governs the manner in which the Free Student Union - DMC Portal collects, uses, maintains and discloses information collected from users.",
     termsEn: "By accessing this portal, you agree to use it strictly for academic, inquiry, and constructive feedback purposes. Any spamming of the contact system or unauthorized attempts to access administrative pages is strictly prohibited and subject to institutional discipline.",
-    termsNp: "By accessing this portal, you agree to use it strictly for academic, inquiry, and constructive feedback purposes."
+    termsNp: "By accessing this portal, you agree to use it strictly for academic, inquiry, and constructive feedback purposes.",
+    dmcHistoryHeading: "History of Darchula Multiple Campus",
+    dmcHistoryText: "Darchula Multiple Campus (DMC), established in 2062 B.S. (2005 A.D.), stands as the premier higher education beacon in the far-western Himalayan district of Darchula, Nepal. Affiliated with Farwestern University (FWU), the campus was established through the collective vision and relentless dedication of local educators, intellectuals, and community leaders to make quality university education accessible to students in remote mountainous terrain.\n\nOver the past two decades, DMC has expanded its academic horizons across Education, Humanities, and Management streams. DMC continues to cultivate academic excellence, moral integrity, and social leadership among Himalayan youth.",
+    dmcEstYear: "Est. 2062 B.S. (2005 A.D.)",
+    dmcFacebookProfileUrl: "https://facebook.com/DarchulaMultipleCampusOfficial",
+    dmcFacebookButtonText: "Visit Official Facebook Profile",
   },
   slides: {
     "slide_1": {

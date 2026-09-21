@@ -1,9 +1,21 @@
-import React, { useState, useEffect, useRef } from "react";
-import { NewsItem } from "../types";
-import { Calendar, FileText, ChevronRight, Eye, X } from "lucide-react";
+import React, { useState } from "react";
+import { NewsItem, GeneralSettings } from "../types";
+import {
+  Calendar,
+  FileText,
+  ChevronRight,
+  Eye,
+  X,
+  Landmark,
+  GraduationCap,
+  Award,
+  Facebook,
+  ExternalLink,
+} from "lucide-react";
 
 interface NewsSectionProps {
   news: NewsItem[];
+  settings?: GeneralSettings;
   lang?: "en" | "np";
   selectedNewsId: string | null;
   setSelectedNewsId: (id: string | null) => void;
@@ -11,33 +23,11 @@ interface NewsSectionProps {
 
 export default function NewsSection({
   news,
+  settings,
   selectedNewsId,
   setSelectedNewsId,
 }: NewsSectionProps) {
   const [showAllModal, setShowAllModal] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll the horizontal deck
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || news.length <= 1) return;
-
-    let animId: number;
-    const scrollSpeed = 0.5;
-
-    const step = () => {
-      if (el) {
-        el.scrollLeft += scrollSpeed;
-        if (el.scrollLeft >= el.scrollWidth / 2) {
-          el.scrollLeft = 0;
-        }
-      }
-      animId = requestAnimationFrame(step);
-    };
-
-    animId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animId);
-  }, [news]);
 
   const sortedNews = [...news].sort((a, b) => b.createdAt - a.createdAt);
   const verticalNewsList = sortedNews.slice(0, 6);
@@ -97,47 +87,78 @@ export default function NewsSection({
         )}
       </div>
 
-      {/* Right Side / Horizontal Scrolling Preview Deck */}
-      <div className="lg:col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-        <h3 className="text-lg font-serif font-black text-slate-900 mb-4 flex items-center gap-2 border-l-4 border-red-700 pl-3">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-700 animate-pulse" />
-          <span>Notice Preview Deck</span>
-        </h3>
+      {/* Right Side: History of DMC Box */}
+      <div className="lg:col-span-4 bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between">
+        <div>
+          {/* Header with Landmark Icon and Established Year Badge */}
+          <div className="flex items-center justify-between gap-2 mb-4 border-l-4 border-red-700 pl-3">
+            <h3 className="text-lg font-serif font-black text-slate-900 flex items-center gap-2">
+              <Landmark className="w-5 h-5 text-red-700 shrink-0" />
+              <span>{settings?.dmcHistoryHeading || "History of DMC"}</span>
+            </h3>
+            <span className="text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200/80 px-2.5 py-1 rounded-full shrink-0">
+              {settings?.dmcEstYear || "Est. 2062 B.S."}
+            </span>
+          </div>
 
-        <div
-          ref={scrollRef}
-          className="w-full flex flex-col gap-4 overflow-x-auto select-none max-h-[360px] overflow-y-hidden"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {news.length === 0 ? (
-            <p className="text-gray-400 text-xs py-4 font-mono">No notices.</p>
-          ) : (
-            <div className="flex gap-4 w-max py-2">
-              {[...news, ...news].map((item, idx) => (
-                <div
-                  key={`${item.id}-${idx}`}
-                  onClick={() => setSelectedNewsId(item.id)}
-                  className="w-56 bg-slate-50/60 hover:bg-blue-50/50 border border-slate-100 hover:border-blue-200/50 p-4 rounded-2xl shrink-0 transition duration-200 cursor-pointer shadow-sm flex flex-col justify-between"
-                >
-                  <div>
-                    <span className="text-[9px] text-red-700 font-bold uppercase tracking-wider block mb-1">
-                      🔔 NOTICE BOARD
-                    </span>
-                    <h5 className="font-bold text-xs text-slate-800 line-clamp-3 leading-snug">
-                      {item.headingEn}
-                    </h5>
-                  </div>
-                  <span className="text-[9px] text-gray-400 mt-2 font-mono block">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              ))}
+          {/* History Narrative */}
+          <div className="space-y-3 text-xs sm:text-sm text-slate-600 leading-relaxed font-sans">
+            <p className="whitespace-pre-line text-slate-700">
+              {settings?.dmcHistoryText ||
+                "Darchula Multiple Campus (DMC), established in 2062 B.S. (2005 A.D.), stands as the premier higher education beacon in the far-western Himalayan district of Darchula, Nepal. Affiliated with Farwestern University (FWU), the campus was established through the collective vision and commitment of dedicated local educators, social pioneers, and intellectuals to bring accessible university education to remote mountain youth.\n\nOver the past two decades, DMC has cultivated hundreds of graduates in Education, Humanities, and Management streams, transforming academic access across Darchula and surrounding Himalayan regions."}
+            </p>
+          </div>
+
+          {/* Institutional Highlights */}
+          <div className="grid grid-cols-2 gap-2 pt-4 mt-4 border-t border-slate-100 text-[11px] font-medium text-slate-700">
+            <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-blue-900 shrink-0" />
+              <span className="truncate">FWU Affiliation</span>
             </div>
-          )}
+            <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex items-center gap-2">
+              <Award className="w-4 h-4 text-red-700 shrink-0" />
+              <span className="truncate">Mountain Pioneer</span>
+            </div>
+          </div>
         </div>
-        <p className="text-[11px] text-center text-gray-400 mt-3 italic">
-          ← Auto-sliding deck. Click cards to view details →
-        </p>
+
+        {/* Facebook Profile Connection Card / Link */}
+        <div className="mt-6 pt-4 border-t border-slate-100">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">
+            Connect & Campus Updates
+          </div>
+          <a
+            id="link-dmc-facebook-profile"
+            href={
+              settings?.dmcFacebookProfileUrl ||
+              settings?.fbCampusPage ||
+              "https://facebook.com/DarchulaMultipleCampusOfficial"
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-between p-3.5 bg-blue-50/70 hover:bg-blue-100/80 border border-blue-200/80 hover:border-blue-300 rounded-2xl transition-all duration-200 group text-blue-950 shadow-xs"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#1877F2] text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
+                <Facebook className="w-5 h-5 fill-current" />
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-bold text-slate-900 group-hover:text-blue-950 flex items-center gap-1">
+                  <span>
+                    {settings?.dmcFacebookButtonText || "DMC Official Facebook"}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-900" />
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Daily announcements, events & student notices
+                </div>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-[#1877F2] px-2.5 py-1 bg-white rounded-lg border border-blue-100 shadow-2xs shrink-0 group-hover:translate-x-0.5 transition-transform">
+              Visit &rarr;
+            </span>
+          </a>
+        </div>
       </div>
 
       {/* FULL NEWS ARCHIVE MODAL */}

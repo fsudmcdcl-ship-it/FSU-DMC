@@ -381,9 +381,10 @@ export default function App() {
                 </div>
               </div>
 
-              {/* News & Scrolling Deck */}
+              {/* News & History of DMC Section */}
               <NewsSection
                 news={news}
+                settings={settings}
                 selectedNewsId={selectedNewsId}
                 setSelectedNewsId={setSelectedNewsId}
               />

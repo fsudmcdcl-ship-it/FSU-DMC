@@ -49,7 +49,9 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  Landmark,
+  Facebook
 } from "lucide-react";
 
 interface CMSPanelProps {
@@ -1022,6 +1024,115 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
                     placeholder="https://facebook.com/..."
                   />
+                </div>
+              </div>
+
+              {/* History of DMC Box & Facebook Profile Settings */}
+              <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <Landmark className="w-4 h-4 text-red-700" />
+                  <h4 className="text-sm font-bold text-slate-800">
+                    History of DMC Box & Facebook Profile Link
+                  </h4>
+                  <span className="text-[10px] bg-red-100 text-red-800 font-mono px-2 py-0.5 rounded-full font-bold ml-auto">
+                    Homepage Widget
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                      Box Heading
+                    </label>
+                    <input
+                      type="text"
+                      value={genSettingsForm.dmcHistoryHeading || ""}
+                      onChange={(e) =>
+                        setGenSettingsForm({
+                          ...genSettingsForm,
+                          dmcHistoryHeading: e.target.value,
+                        })
+                      }
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none"
+                      placeholder="History of DMC"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                      Established Year / Badge Text
+                    </label>
+                    <input
+                      type="text"
+                      value={genSettingsForm.dmcEstYear || ""}
+                      onChange={(e) =>
+                        setGenSettingsForm({
+                          ...genSettingsForm,
+                          dmcEstYear: e.target.value,
+                        })
+                      }
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none"
+                      placeholder="Est. 2062 B.S. (2005 A.D.)"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                    History of DMC Description / Narrative
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={genSettingsForm.dmcHistoryText || ""}
+                    onChange={(e) =>
+                      setGenSettingsForm({
+                        ...genSettingsForm,
+                        dmcHistoryText: e.target.value,
+                      })
+                    }
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none"
+                    placeholder="Enter the detailed history of Darchula Multiple Campus..."
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Displayed on the homepage next to the Recent News & Notices list.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                      <Facebook className="w-3.5 h-3.5 text-[#1877F2]" />
+                      <span>Facebook Profile / Page URL</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={genSettingsForm.dmcFacebookProfileUrl || ""}
+                      onChange={(e) =>
+                        setGenSettingsForm({
+                          ...genSettingsForm,
+                          dmcFacebookProfileUrl: e.target.value,
+                        })
+                      }
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none"
+                      placeholder="https://facebook.com/..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                      Facebook Button Label
+                    </label>
+                    <input
+                      type="text"
+                      value={genSettingsForm.dmcFacebookButtonText || ""}
+                      onChange={(e) =>
+                        setGenSettingsForm({
+                          ...genSettingsForm,
+                          dmcFacebookButtonText: e.target.value,
+                        })
+                      }
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none"
+                      placeholder="Visit Official Facebook Profile"
+                    />
+                  </div>
                 </div>
               </div>
 

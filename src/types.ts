@@ -26,6 +26,12 @@ export interface GeneralSettings {
   privacyPolicyNp: string;
   termsEn: string;
   termsNp: string;
+  // History of DMC & Facebook Profile Link
+  dmcHistoryHeading?: string;
+  dmcHistoryText?: string;
+  dmcEstYear?: string;
+  dmcFacebookProfileUrl?: string;
+  dmcFacebookButtonText?: string;
 }
 
 export interface SlideItem {
