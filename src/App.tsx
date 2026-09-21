@@ -43,6 +43,7 @@ import HelpdeskPage from "./pages/HelpdeskPage";
 import SecretariatPage from "./pages/SecretariatPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsPage from "./pages/TermsPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 import { ArrowDown, Facebook, GraduationCap, ShieldCheck, ExternalLink } from "lucide-react";
 
@@ -60,7 +61,8 @@ export type RouteType =
   | "campus-staff"
   | "professors"
   | "fsu-helpdesk"
-  | "contact-secretariat";
+  | "contact-secretariat"
+  | "not-found";
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,7 @@ export default function App() {
 
   // Active Route
   const [currentRoute, setCurrentRoute] = useState<RouteType>("home");
+  const [attemptedSlug, setAttemptedSlug] = useState<string>("");
 
   // Notice and modal focus states
   const [forceNoticeTrigger, setForceNoticeTrigger] = useState(0);
@@ -75,65 +78,90 @@ export default function App() {
   const [selectedBlogId, setSelectedBlogId] = useState<string | null>(null);
 
   // Router parsing logic
-  const parsePathToRoute = (): RouteType => {
-    const path = window.location.pathname.toLowerCase();
-    const hash = window.location.hash.toLowerCase();
+  const parsePathToRoute = (): { route: RouteType; slug?: string } => {
+    const rawPath = window.location.pathname;
+    const path = rawPath.toLowerCase();
+    const rawHash = window.location.hash;
+    const hash = rawHash.toLowerCase();
     const params = new URLSearchParams(window.location.search);
     const pageParam = params.get("page")?.toLowerCase();
 
     // Check query params
-    if (pageParam === "campuslogin") return "campuslogin";
-    if (pageParam === "messages" || pageParam === "databasemessage2083") return "databasemessage2083";
-    if (pageParam === "about") return "about";
-    if (pageParam === "syllabus-notes") return "syllabus-notes";
-    if (pageParam === "fsu-team") return "fsu-team";
-    if (pageParam === "student-blogs") return "student-blogs";
-    if (pageParam === "contact") return "contact";
-    if (pageParam === "privacy-policy") return "privacy-policy";
-    if (pageParam === "terms-and-conditions") return "terms-and-conditions";
-    if (pageParam === "campus-staff") return "campus-staff";
-    if (pageParam === "professors") return "professors";
-    if (pageParam === "fsu-helpdesk") return "fsu-helpdesk";
-    if (pageParam === "contact-secretariat") return "contact-secretariat";
+    if (pageParam) {
+      if (pageParam === "home") return { route: "home" };
+      if (pageParam === "campuslogin") return { route: "campuslogin" };
+      if (pageParam === "messages" || pageParam === "databasemessage2083") return { route: "databasemessage2083" };
+      if (pageParam === "about") return { route: "about" };
+      if (pageParam === "syllabus-notes") return { route: "syllabus-notes" };
+      if (pageParam === "fsu-team") return { route: "fsu-team" };
+      if (pageParam === "student-blogs") return { route: "student-blogs" };
+      if (pageParam === "contact") return { route: "contact" };
+      if (pageParam === "privacy-policy") return { route: "privacy-policy" };
+      if (pageParam === "terms-and-conditions") return { route: "terms-and-conditions" };
+      if (pageParam === "campus-staff") return { route: "campus-staff" };
+      if (pageParam === "professors") return { route: "professors" };
+      if (pageParam === "fsu-helpdesk") return { route: "fsu-helpdesk" };
+      if (pageParam === "contact-secretariat") return { route: "contact-secretariat" };
+      return { route: "not-found", slug: `?page=${params.get("page")}` };
+    }
 
     // Check hash
-    if (hash === "#campuslogin" || hash === "#/campuslogin") return "campuslogin";
-    if (hash === "#messages" || hash === "#/messages" || hash === "#databasemessage2083" || hash === "#/databasemessage2083")
-      return "databasemessage2083";
-    if (hash === "#about" || hash === "#/about") return "about";
-    if (hash === "#syllabus-notes" || hash === "#/syllabus-notes") return "syllabus-notes";
-    if (hash === "#fsu-team" || hash === "#/fsu-team") return "fsu-team";
-    if (hash === "#student-blogs" || hash === "#/student-blogs") return "student-blogs";
-    if (hash === "#contact" || hash === "#/contact") return "contact";
-    if (hash === "#privacy-policy" || hash === "#/privacy-policy") return "privacy-policy";
-    if (hash === "#terms-and-conditions" || hash === "#/terms-and-conditions") return "terms-and-conditions";
-    if (hash === "#campus-staff" || hash === "#/campus-staff") return "campus-staff";
-    if (hash === "#professors" || hash === "#/professors") return "professors";
-    if (hash === "#fsu-helpdesk" || hash === "#/fsu-helpdesk") return "fsu-helpdesk";
-    if (hash === "#contact-secretariat" || hash === "#/contact-secretariat") return "contact-secretariat";
+    if (hash && hash !== "#" && hash !== "#/") {
+      if (hash === "#home" || hash === "#/home") return { route: "home" };
+      if (hash === "#campuslogin" || hash === "#/campuslogin") return { route: "campuslogin" };
+      if (hash === "#messages" || hash === "#/messages" || hash === "#databasemessage2083" || hash === "#/databasemessage2083")
+        return { route: "databasemessage2083" };
+      if (hash === "#about" || hash === "#/about") return { route: "about" };
+      if (hash === "#syllabus-notes" || hash === "#/syllabus-notes") return { route: "syllabus-notes" };
+      if (hash === "#fsu-team" || hash === "#/fsu-team") return { route: "fsu-team" };
+      if (hash === "#student-blogs" || hash === "#/student-blogs") return { route: "student-blogs" };
+      if (hash === "#contact" || hash === "#/contact") return { route: "contact" };
+      if (hash === "#privacy-policy" || hash === "#/privacy-policy") return { route: "privacy-policy" };
+      if (hash === "#terms-and-conditions" || hash === "#/terms-and-conditions") return { route: "terms-and-conditions" };
+      if (hash === "#campus-staff" || hash === "#/campus-staff") return { route: "campus-staff" };
+      if (hash === "#professors" || hash === "#/professors") return { route: "professors" };
+      if (hash === "#fsu-helpdesk" || hash === "#/fsu-helpdesk") return { route: "fsu-helpdesk" };
+      if (hash === "#contact-secretariat" || hash === "#/contact-secretariat") return { route: "contact-secretariat" };
+      return { route: "not-found", slug: rawHash };
+    }
 
     // Check pathname
-    if (path.endsWith("/campuslogin")) return "campuslogin";
-    if (path.endsWith("/messages") || path.endsWith("/databasemessage2083")) return "databasemessage2083";
-    if (path.endsWith("/about")) return "about";
-    if (path.endsWith("/syllabus-notes")) return "syllabus-notes";
-    if (path.endsWith("/fsu-team")) return "fsu-team";
-    if (path.endsWith("/student-blogs")) return "student-blogs";
-    if (path.endsWith("/contact")) return "contact";
-    if (path.endsWith("/privacy-policy")) return "privacy-policy";
-    if (path.endsWith("/terms-and-conditions")) return "terms-and-conditions";
-    if (path.endsWith("/campus-staff")) return "campus-staff";
-    if (path.endsWith("/professors")) return "professors";
-    if (path.endsWith("/fsu-helpdesk")) return "fsu-helpdesk";
-    if (path.endsWith("/contact-secretariat")) return "contact-secretariat";
+    if (
+      path === "/" ||
+      path === "" ||
+      path.endsWith("/home") ||
+      path.endsWith("/index.html")
+    ) {
+      return { route: "home" };
+    }
 
-    return "home";
+    if (path.endsWith("/campuslogin")) return { route: "campuslogin" };
+    if (path.endsWith("/messages") || path.endsWith("/databasemessage2083")) return { route: "databasemessage2083" };
+    if (path.endsWith("/about")) return { route: "about" };
+    if (path.endsWith("/syllabus-notes")) return { route: "syllabus-notes" };
+    if (path.endsWith("/fsu-team")) return { route: "fsu-team" };
+    if (path.endsWith("/student-blogs")) return { route: "student-blogs" };
+    if (path.endsWith("/contact")) return { route: "contact" };
+    if (path.endsWith("/privacy-policy")) return { route: "privacy-policy" };
+    if (path.endsWith("/terms-and-conditions")) return { route: "terms-and-conditions" };
+    if (path.endsWith("/campus-staff")) return { route: "campus-staff" };
+    if (path.endsWith("/professors")) return { route: "professors" };
+    if (path.endsWith("/fsu-helpdesk")) return { route: "fsu-helpdesk" };
+    if (path.endsWith("/contact-secretariat")) return { route: "contact-secretariat" };
+
+    // Any other pathname is unrecognized
+    return { route: "not-found", slug: rawPath };
   };
 
   useEffect(() => {
     const handleLocationChange = () => {
-      const nextRoute = parsePathToRoute();
-      setCurrentRoute(nextRoute);
+      const result = parsePathToRoute();
+      setCurrentRoute(result.route);
+      if (result.slug) {
+        setAttemptedSlug(result.slug);
+      } else {
+        setAttemptedSlug("");
+      }
     };
 
     handleLocationChange();
@@ -157,6 +185,14 @@ export default function App() {
     // Retain root prefix
     if (route === "home") {
       newUrl.pathname = "/home";
+    } else if (route === "campuslogin") {
+      newUrl.hash = "#campuslogin";
+      newUrl.pathname = "/";
+    } else if (route === "databasemessage2083") {
+      newUrl.hash = "#messages";
+      newUrl.pathname = "/";
+    } else if (route === "not-found") {
+      newUrl.pathname = "/404";
     } else {
       newUrl.pathname = `/${route}`;
     }
@@ -464,6 +500,12 @@ export default function App() {
           <TermsPage
             settings={settings}
             onGoToCMS={() => navigateTo("campuslogin")}
+          />
+        )}
+        {currentRoute === "not-found" && (
+          <NotFoundPage
+            attemptedSlug={attemptedSlug}
+            onNavigate={navigateTo}
           />
         )}
       </main>
