@@ -6,7 +6,7 @@ import { DatabaseState } from "../types";
 // Firebase configuration using environment variables or safe public configuration for DMC
 const env = (import.meta as any).env || {};
 const firebaseConfig = {
-  apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyDMC_FSU_DarchulaMultipleCampus2083",
+ apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyCSbIo5RUS0OZ_-sGuSjFHOy5P7knYWPeY",
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "fsudmc-portal.firebaseapp.com",
   databaseURL: env.VITE_FIREBASE_DATABASE_URL || "https://fsudmc-portal-default-rtdb.firebaseio.com",
   projectId: env.VITE_FIREBASE_PROJECT_ID || "fsudmc-portal",
