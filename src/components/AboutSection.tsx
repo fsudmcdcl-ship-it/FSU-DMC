@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { GeneralSettings } from "../types";
-import { Award, GraduationCap, ArrowRight, X } from "lucide-react";
+import { Award, GraduationCap, ArrowRight, X, ExternalLink } from "lucide-react";
 
 interface AboutSectionProps {
   settings: GeneralSettings;
-  lang: "en" | "np";
+  lang?: "en" | "np";
 }
 
-export default function AboutSection({ settings, lang }: AboutSectionProps) {
+export default function AboutSection({ settings }: AboutSectionProps) {
   const [modalTitle, setModalTitle] = useState("");
   const [modalBody, setModalBody] = useState("");
   const [modalImage, setModalImage] = useState("");
@@ -20,7 +20,7 @@ export default function AboutSection({ settings, lang }: AboutSectionProps) {
 
   return (
     <div className="space-y-16">
-      {/* Segment 1: About Free Student Union */}
+      {/* Segment 1: About Free Student Union - DMC */}
       <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 p-6 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         {/* Left Side: Campus/Union Image */}
         <div className="lg:col-span-5 relative group h-64 md:h-80 overflow-hidden rounded-2xl shadow-sm">
@@ -40,30 +40,30 @@ export default function AboutSection({ settings, lang }: AboutSectionProps) {
         <div className="lg:col-span-7 flex flex-col justify-between">
           <div>
             <span className="text-xs font-bold uppercase tracking-widest text-red-700 block mb-2">
-              {lang === "en" ? "REPRESENTATIVE BODY" : "विद्यार्थी संगठन"}
+              REPRESENTATIVE BODY
             </span>
             <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 mb-4 leading-tight">
-              {lang === "en" ? "ABOUT FREE STUDENT UNION" : "स्वतन्त्र विद्यार्थी युनियन बारे"}
+              ABOUT FREE STUDENT UNION - DMC
             </h3>
             {/* Clamped to exactly 6 lines of preview */}
             <p className="text-sm text-slate-600 leading-relaxed line-clamp-[6] whitespace-pre-line mb-6 font-sans">
-              {lang === "en"
-                ? (settings?.aboutFsuEn || "No data.")
-                : (settings?.aboutFsuNp || "विवरण उपलब्ध छैन।")}
+              {settings?.aboutFsuEn ||
+                "The Free Student Union (FSU) at Darchula Multiple Campus is the officially mandated student governing council dedicated to representing student rights, organizing academic forums, ensuring equitable welfare funds, and fostering educational excellence in far-western Nepal."}
             </p>
           </div>
 
           <button
             onClick={() =>
               handleReadMore(
-                lang === "en" ? "About Free Student Union" : "स्वतन्त्र विद्यार्थी युनियन बारे",
-                lang === "en" ? settings?.aboutFsuEn : settings?.aboutFsuNp,
+                "About Free Student Union - DMC",
+                settings?.aboutFsuEn ||
+                  "The Free Student Union (FSU) at Darchula Multiple Campus is the officially mandated student governing council dedicated to representing student rights, organizing academic forums, ensuring equitable welfare funds, and fostering educational excellence in far-western Nepal.",
                 settings?.aboutFsuImg
               )
             }
             className="self-start px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-red-100 flex items-center gap-2 group/btn cursor-pointer"
           >
-            <span>{lang === "en" ? "Read More" : "थप हेर्नुहोस्"}</span>
+            <span>Read More</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
           </button>
         </div>
@@ -88,31 +88,42 @@ export default function AboutSection({ settings, lang }: AboutSectionProps) {
         {/* Right Side: Details */}
         <div className="lg:col-span-7 flex flex-col justify-between">
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-blue-900 block mb-2">
-              {lang === "en" ? "ACADEMIC INSTITUTION AFFILIATED TO TU" : "शैक्षिक प्रतिष्ठान"}
-            </span>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-blue-900">
+                AFFILIATED TO
+              </span>
+              <a
+                href="https://fwu.edu.np"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold text-red-700 hover:text-red-800 underline uppercase tracking-widest inline-flex items-center gap-1"
+              >
+                <span>FARWESTERN UNIVERSITY</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
             <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 mb-4 leading-tight">
-              {lang === "en" ? "ABOUT DARCHULA MULTIPLE CAMPUS" : "दार्चुला बहुमुखी क्याम्पस बारे"}
+              ABOUT DARCHULA MULTIPLE CAMPUS
             </h3>
-            {/* Clamped to exactly 6 lines of preview */}
+            {/* Clamped to preview */}
             <p className="text-sm text-slate-600 leading-relaxed line-clamp-[6] whitespace-pre-line mb-6 font-sans">
-              {lang === "en"
-                ? (settings?.aboutCampusEn || "No data.")
-                : (settings?.aboutCampusNp || "विवरण उपलब्ध छैन।")}
+              {settings?.aboutCampusEn ||
+                "Darchula Multiple Campus stands as the flagship community-based higher education institution in Darchula District. Affiliated with Farwestern University (FWU), the campus offers comprehensive undergraduate and graduate degree programs in Management (BBS, MBS), Education (B.Ed, M.Ed), and Humanities (BA), empowering students from remote mountainous borderlands."}
             </p>
           </div>
 
           <button
             onClick={() =>
               handleReadMore(
-                lang === "en" ? "About Darchula Multiple Campus" : "दार्चुला बहुमुखी क्याम्पस बारे",
-                lang === "en" ? settings?.aboutCampusEn : settings?.aboutCampusNp,
+                "About Darchula Multiple Campus",
+                settings?.aboutCampusEn ||
+                  "Darchula Multiple Campus stands as the flagship community-based higher education institution in Darchula District. Affiliated with Farwestern University (FWU), the campus offers comprehensive undergraduate and graduate degree programs in Management (BBS, MBS), Education (B.Ed, M.Ed), and Humanities (BA), empowering students from remote mountainous borderlands.",
                 settings?.aboutCampusImg
               )
             }
             className="self-start px-5 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-blue-100 flex items-center gap-2 group/btn cursor-pointer"
           >
-            <span>{lang === "en" ? "Read More" : "थप हेर्नुहोस्"}</span>
+            <span>Read More</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
           </button>
         </div>
@@ -138,12 +149,14 @@ export default function AboutSection({ settings, lang }: AboutSectionProps) {
 
             {/* Scrollable text details */}
             <div className="p-6 overflow-y-auto space-y-4 flex-1">
-              <img
-                src={modalImage}
-                alt={modalTitle}
-                className="w-full h-64 object-cover rounded-2xl border border-slate-100 shadow-sm"
-                referrerPolicy="no-referrer"
-              />
+              {modalImage && (
+                <img
+                  src={modalImage}
+                  alt={modalTitle}
+                  className="w-full h-64 object-cover rounded-2xl border border-slate-100 shadow-sm"
+                  referrerPolicy="no-referrer"
+                />
+              )}
               <p className="text-sm md:text-base text-slate-700 leading-relaxed whitespace-pre-line font-sans p-5 bg-slate-50 rounded-2xl border border-slate-100/60">
                 {modalBody}
               </p>
@@ -155,7 +168,7 @@ export default function AboutSection({ settings, lang }: AboutSectionProps) {
                 onClick={() => setModalTitle("")}
                 className="px-5 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
               >
-                {lang === "en" ? "Close" : "बन्द गर्नुहोस्"}
+                Close
               </button>
             </div>
           </div>

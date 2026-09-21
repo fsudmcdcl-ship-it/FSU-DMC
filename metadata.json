@@ -1,6 +1,6 @@
 {
-  "name": "Free Student Union - Darchula Multiple Campus",
-  "description": "Website for Free Students Union (FSU) of Darchula Multiple Campus (DMC) with dynamic CMS management, news, downloads, student blogs, FSU team, message boards, and secure contact forms.",
+  "name": "Free Student Union - DMC",
+  "description": "Official website for Free Student Union - DMC (Darchula Multiple Campus), affiliated with Farwestern University. Features student services, academic syllabus, notices, helpdesk, blogs, and staff directories.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

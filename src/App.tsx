@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { ref, onValue } from "firebase/database";
 import { rtdb, seedInitialDataIfEmpty } from "./lib/firebase";
-import { DatabaseState, GeneralSettings, ImportantNotice, SlideItem, NewsItem, DownloadItem, TeamMember, BlogItem } from "./types";
+import {
+  DatabaseState,
+  GeneralSettings,
+  ImportantNotice,
+  SlideItem,
+  NewsItem,
+  DownloadItem,
+  TeamMember,
+  BlogItem,
+} from "./types";
 import { DEFAULT_DB_STATE } from "./lib/defaults";
 
-// Components
+// Core Components
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Slider from "./components/Slider";
@@ -20,92 +29,144 @@ import PopupNotice from "./components/PopupNotice";
 import CMSPanel from "./components/CMSPanel";
 import MessagesViewer from "./components/MessagesViewer";
 
-import { GraduationCap, ArrowDown, HelpCircle, Facebook, Info } from "lucide-react";
+// Page Views
+import AboutPage from "./pages/AboutPage";
+import SyllabusPage from "./pages/SyllabusPage";
+import TeamPage from "./pages/TeamPage";
+import BlogsPage from "./pages/BlogsPage";
+import ContactPage from "./pages/ContactPage";
+import CampusStaffPage from "./pages/CampusStaffPage";
+import ProfessorsPage from "./pages/ProfessorsPage";
+import HelpdeskPage from "./pages/HelpdeskPage";
+import SecretariatPage from "./pages/SecretariatPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsPage from "./pages/TermsPage";
 
-type RouteState = "home" | "cms" | "messages";
+import { ArrowDown, Facebook, GraduationCap, ShieldCheck, ExternalLink } from "lucide-react";
+
+export type RouteType =
+  | "home"
+  | "about"
+  | "syllabus-notes"
+  | "fsu-team"
+  | "student-blogs"
+  | "contact"
+  | "campuslogin"
+  | "databasemessage2083"
+  | "privacy-policy"
+  | "terms-and-conditions"
+  | "campus-staff"
+  | "professors"
+  | "fsu-helpdesk"
+  | "contact-secretariat";
 
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [dbState, setDbState] = useState<DatabaseState>(DEFAULT_DB_STATE);
-  
-  // Routing and languages
-  const [route, setRoute] = useState<RouteState>("home");
-  const [lang, setLang] = useState<"en" | "np">("en");
-  
-  // Notice and focus items
+
+  // Active Route
+  const [currentRoute, setCurrentRoute] = useState<RouteType>("home");
+
+  // Notice and modal focus states
   const [forceNoticeTrigger, setForceNoticeTrigger] = useState(0);
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
   const [selectedBlogId, setSelectedBlogId] = useState<string | null>(null);
 
-  // Active scrolled section (Home, About, etc.)
-  const [activeSection, setActiveSection] = useState("home");
+  // Router parsing logic
+  const parsePathToRoute = (): RouteType => {
+    const path = window.location.pathname.toLowerCase();
+    const hash = window.location.hash.toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    const pageParam = params.get("page")?.toLowerCase();
 
-  // Router listener
+    // Check query params
+    if (pageParam === "campuslogin") return "campuslogin";
+    if (pageParam === "messages" || pageParam === "databasemessage2083") return "databasemessage2083";
+    if (pageParam === "about") return "about";
+    if (pageParam === "syllabus-notes") return "syllabus-notes";
+    if (pageParam === "fsu-team") return "fsu-team";
+    if (pageParam === "student-blogs") return "student-blogs";
+    if (pageParam === "contact") return "contact";
+    if (pageParam === "privacy-policy") return "privacy-policy";
+    if (pageParam === "terms-and-conditions") return "terms-and-conditions";
+    if (pageParam === "campus-staff") return "campus-staff";
+    if (pageParam === "professors") return "professors";
+    if (pageParam === "fsu-helpdesk") return "fsu-helpdesk";
+    if (pageParam === "contact-secretariat") return "contact-secretariat";
+
+    // Check hash
+    if (hash === "#campuslogin" || hash === "#/campuslogin") return "campuslogin";
+    if (hash === "#messages" || hash === "#/messages" || hash === "#databasemessage2083" || hash === "#/databasemessage2083")
+      return "databasemessage2083";
+    if (hash === "#about" || hash === "#/about") return "about";
+    if (hash === "#syllabus-notes" || hash === "#/syllabus-notes") return "syllabus-notes";
+    if (hash === "#fsu-team" || hash === "#/fsu-team") return "fsu-team";
+    if (hash === "#student-blogs" || hash === "#/student-blogs") return "student-blogs";
+    if (hash === "#contact" || hash === "#/contact") return "contact";
+    if (hash === "#privacy-policy" || hash === "#/privacy-policy") return "privacy-policy";
+    if (hash === "#terms-and-conditions" || hash === "#/terms-and-conditions") return "terms-and-conditions";
+    if (hash === "#campus-staff" || hash === "#/campus-staff") return "campus-staff";
+    if (hash === "#professors" || hash === "#/professors") return "professors";
+    if (hash === "#fsu-helpdesk" || hash === "#/fsu-helpdesk") return "fsu-helpdesk";
+    if (hash === "#contact-secretariat" || hash === "#/contact-secretariat") return "contact-secretariat";
+
+    // Check pathname
+    if (path.endsWith("/campuslogin")) return "campuslogin";
+    if (path.endsWith("/databasemessage2083")) return "databasemessage2083";
+    if (path.endsWith("/about")) return "about";
+    if (path.endsWith("/syllabus-notes")) return "syllabus-notes";
+    if (path.endsWith("/fsu-team")) return "fsu-team";
+    if (path.endsWith("/student-blogs")) return "student-blogs";
+    if (path.endsWith("/contact")) return "contact";
+    if (path.endsWith("/privacy-policy")) return "privacy-policy";
+    if (path.endsWith("/terms-and-conditions")) return "terms-and-conditions";
+    if (path.endsWith("/campus-staff")) return "campus-staff";
+    if (path.endsWith("/professors")) return "professors";
+    if (path.endsWith("/fsu-helpdesk")) return "fsu-helpdesk";
+    if (path.endsWith("/contact-secretariat")) return "contact-secretariat";
+
+    return "home";
+  };
+
   useEffect(() => {
-    const handleRouting = () => {
-      const path = window.location.pathname.toLowerCase();
-      const hash = window.location.hash.toLowerCase();
-      const params = new URLSearchParams(window.location.search);
-      const pageParam = params.get("page");
-
-      if (path.endsWith("/campuslogin") || hash === "#campuslogin" || hash === "#/campuslogin" || pageParam === "campuslogin") {
-        setRoute("cms");
-      } else if (path.endsWith("/databasemessage2083") || hash === "#messages" || hash === "#/messages" || pageParam === "messages") {
-        setRoute("messages");
-      } else {
-        setRoute("home");
-      }
+    const handleLocationChange = () => {
+      const nextRoute = parsePathToRoute();
+      setCurrentRoute(nextRoute);
     };
 
-    handleRouting();
-    window.addEventListener("popstate", handleRouting);
-    window.addEventListener("hashchange", handleRouting);
+    handleLocationChange();
+    window.addEventListener("popstate", handleLocationChange);
+    window.addEventListener("hashchange", handleLocationChange);
 
     return () => {
-      window.removeEventListener("popstate", handleRouting);
-      window.removeEventListener("hashchange", handleRouting);
+      window.removeEventListener("popstate", handleLocationChange);
+      window.removeEventListener("hashchange", handleLocationChange);
     };
   }, []);
 
-  // Update navigation history pathname dynamically (subdirectory-safe for GitHub Pages)
-  const navigateTo = (targetRoute: RouteState) => {
-    setRoute(targetRoute);
+  const navigateTo = (route: RouteType) => {
+    setCurrentRoute(route);
     const newUrl = new URL(window.location.href);
-    
-    // Clean query params and hash
+
+    // Clean query params & hash
     newUrl.searchParams.delete("page");
     newUrl.hash = "";
 
-    // Extract any repository subdirectory prefix (e.g., /repository-name) from current path
-    const currentPath = window.location.pathname;
-    let repoPrefix = "";
-    
-    if (currentPath.toLowerCase().endsWith("/campuslogin")) {
-      repoPrefix = currentPath.substring(0, currentPath.length - "/campuslogin".length);
-    } else if (currentPath.toLowerCase().endsWith("/databasemessage2083")) {
-      repoPrefix = currentPath.substring(0, currentPath.length - "/databasemessage2083".length);
+    // Retain root prefix
+    if (route === "home") {
+      newUrl.pathname = "/home";
     } else {
-      repoPrefix = currentPath;
-    }
-    
-    // Clean trailing slash of prefix
-    if (repoPrefix.endsWith("/")) {
-      repoPrefix = repoPrefix.slice(0, -1);
+      newUrl.pathname = `/${route}`;
     }
 
-    if (targetRoute === "cms") {
-      newUrl.pathname = repoPrefix + "/";
-      newUrl.hash = "campuslogin";
+    try {
       window.history.pushState({}, "", newUrl.toString());
-    } else if (targetRoute === "messages") {
-      newUrl.pathname = repoPrefix + "/";
-      newUrl.hash = "messages";
-      window.history.pushState({}, "", newUrl.toString());
-    } else {
-      newUrl.pathname = repoPrefix + "/";
-      newUrl.hash = "";
-      window.history.pushState({}, "", newUrl.toString());
+    } catch {
+      // Fallback to hash if pushState fails in preview environment
+      window.location.hash = `#/${route}`;
     }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Sync DB and Seed if empty
@@ -122,30 +183,34 @@ export default function App() {
       "news",
       "downloads",
       "blogs",
-      "team"
+      "team",
     ];
 
     let loadedCount = 0;
     const unsubscribes = publicKeys.map((key) => {
       const nodeRef = ref(rtdb, key);
-      return onValue(nodeRef, (snapshot) => {
-        const val = snapshot.val();
-        setDbState((prev) => ({
-          ...prev,
-          [key]: val || DEFAULT_DB_STATE[key]
-        }));
-        
-        loadedCount++;
-        if (loadedCount >= publicKeys.length) {
-          setLoading(false);
+      return onValue(
+        nodeRef,
+        (snapshot) => {
+          const val = snapshot.val();
+          setDbState((prev) => ({
+            ...prev,
+            [key]: val || DEFAULT_DB_STATE[key],
+          }));
+
+          loadedCount++;
+          if (loadedCount >= publicKeys.length) {
+            setLoading(false);
+          }
+        },
+        (err) => {
+          console.error(`Failed to read node ${key}: `, err);
+          loadedCount++;
+          if (loadedCount >= publicKeys.length) {
+            setLoading(false);
+          }
         }
-      }, (err) => {
-        console.error(`Failed to read node ${key}: `, err);
-        loadedCount++;
-        if (loadedCount >= publicKeys.length) {
-          setLoading(false);
-        }
-      });
+      );
     });
 
     return () => {
@@ -153,236 +218,252 @@ export default function App() {
     };
   }, []);
 
-  // Scroll Spy to highlight active section on nav tab
-  useEffect(() => {
-    if (route !== "home") return;
-
-    const handleScroll = () => {
-      const sections = ["home", "about", "syllabus", "team", "blogs", "contact"];
-      const scrollPos = window.scrollY + 160;
-
-      for (const sectionId of sections) {
-        const el = document.getElementById(sectionId);
-        if (el) {
-          const offsetTop = el.offsetTop;
-          const offsetHeight = el.offsetHeight;
-          if (scrollPos >= offsetTop && scrollPos < offsetTop + offsetHeight) {
-            setActiveSection(sectionId);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [route]);
-
-  const handleNavClick = (sectionId: string) => {
-    if (sectionId === "cms") {
-      navigateTo("cms");
-      return;
-    }
-
-    if (route !== "home") {
-      navigateTo("home");
-      // Delayed scroll after navigation completes
-      setTimeout(() => {
-        const el = document.getElementById(sectionId);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 100);
-    } else {
-      const el = document.getElementById(sectionId);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
-      }
-    }
-  };
-
-
-
   // Safe variables derived from State
-  const settings: GeneralSettings = dbState?.generalSettings || {} as GeneralSettings;
+  const settings: GeneralSettings = dbState?.generalSettings || ({} as GeneralSettings);
   const slides: SlideItem[] = dbState?.slides ? Object.values(dbState.slides) : [];
   const news: NewsItem[] = dbState?.news ? Object.values(dbState.news) : [];
   const downloads: DownloadItem[] = dbState?.downloads ? Object.values(dbState.downloads) : [];
   const blogs: BlogItem[] = dbState?.blogs ? Object.values(dbState.blogs) : [];
   const team: TeamMember[] = dbState?.team ? Object.values(dbState.team) : [];
-  const importantNotice: ImportantNotice = dbState?.importantNotice || { active: false } as ImportantNotice;
+  const importantNotice: ImportantNotice = dbState?.importantNotice || ({ active: false } as ImportantNotice);
+
+  const president = team.find((m) => m.order === 1);
 
   // ROUTE 1: CMS PANEL
-  if (route === "cms") {
+  if (currentRoute === "campuslogin") {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col justify-between">
         <CMSPanel
           state={dbState!}
-          lang={lang}
           onGoHome={() => navigateTo("home")}
-          onGoMessages={() => navigateTo("messages")}
+          onGoMessages={() => navigateTo("databasemessage2083")}
         />
-        <Footer settings={settings} lang={lang} />
+        <Footer settings={settings} onNavigate={(slug) => navigateTo(slug as RouteType)} />
       </div>
     );
   }
 
   // ROUTE 2: MESSAGES / INBOX VIEWER
-  if (route === "messages") {
+  if (currentRoute === "databasemessage2083") {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col justify-between">
-        <MessagesViewer
-          lang={lang}
-          onGoHome={() => navigateTo("home")}
-        />
-        <Footer settings={settings} lang={lang} />
+        <MessagesViewer onGoHome={() => navigateTo("home")} />
+        <Footer settings={settings} onNavigate={(slug) => navigateTo(slug as RouteType)} />
       </div>
     );
   }
 
-  // ROUTE 3: MAIN PUBLIC SINGLE PAGE
+  // RENDER MAIN PUBLIC PLATFORM
   return (
-    <div className="min-h-screen bg-neutral-50/30 text-gray-800 flex flex-col justify-between selection:bg-emerald-200">
-      
+    <div className="min-h-screen bg-neutral-50/30 text-gray-800 flex flex-col justify-between selection:bg-red-200">
       {/* Dynamic Important Alert Overlay shown on load */}
       <PopupNotice
         notice={importantNotice}
-        lang={lang}
         forceOpenTrigger={forceNoticeTrigger}
       />
 
-      {/* Main Bilingual Header */}
+      {/* Main Clean English Header with Sticky Behavior */}
       <Header
         settings={settings}
-        lang={lang}
-        setLang={setLang}
-        activeSection={activeSection}
-        onNavClick={handleNavClick}
+        activeSection={currentRoute}
+        onNavClick={(sectionId) => navigateTo(sectionId as RouteType)}
         onOpenImportantNotice={() => setForceNoticeTrigger((prev) => prev + 1)}
       />
 
       {/* Sliding announcements ticker */}
       <Marquee
         news={news}
-        lang={lang}
         onNewsClick={(id) => {
           setSelectedNewsId(id);
         }}
       />
 
-      {/* Primary body contents structured in different scrollable sections */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-24 w-full">
-        
-        {/* SECTION 1: HOME PAGE HERO / SLIDER / NEWS SCREEN */}
-        <section id="home" className="scroll-mt-16 space-y-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            {/* Left Column: Campus slider */}
-            <div className="lg:col-span-7 flex flex-col justify-between">
-              <Slider slides={slides} lang={lang} />
-            </div>
+      {/* Primary body contents rendered conditionally based on route */}
+      <main className="flex-1 w-full flex flex-col items-center">
+        {currentRoute === "home" && (
+          <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-20 w-full">
+            {/* HERO SECTION */}
+            <section id="home" className="space-y-12">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+                {/* Left Column: Campus slider */}
+                <div className="lg:col-span-7 flex flex-col justify-between">
+                  <Slider slides={slides} />
+                </div>
 
-            {/* Right Column: Mini Intro card */}
-            <div className="lg:col-span-5 bg-white p-6 rounded-3xl shadow-sm border border-slate-100/80 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block mb-2">
-                  {lang === "en" ? "WELCOME TO DARCHULA" : "सुदूरपश्चिमको प्रसिद्ध शैक्षिक केन्द्र"}
-                </span>
-                <h3 className="text-xl font-extrabold text-gray-900 leading-tight mb-4">
-                  {lang === "en"
-                    ? "Welcome to Free Student Union (FSU) Portal"
-                    : "स्वतन्त्र विद्यार्थी युनियन डिजिटल पोर्टलमा स्वागत छ"}
-                </h3>
-                <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                  {lang === "en"
-                    ? "Darchula Multiple Campus is affiliate to Tribhuvan University. The FSU represents the unified voice of progressive students working to safeguard academic excellence and campus welfare."
-                    : "दार्चुला बहुमुखी क्याम्पस त्रिभुवन विश्वविद्यालयबाट सम्बन्धन प्राप्त सुदूरपश्चिमकै अग्रणी क्याम्पस हो। यहाँका विद्यार्थीहरूको हकहित संरक्षण, गुणस्तरीय शिक्षा प्राप्ति र रचनात्मक नेतृत्व विकासका लागि स्ववियु सदैव समर्पित छ।"}
+                {/* Right Column: Intro card */}
+                <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-bold text-red-700 uppercase tracking-widest block">
+                      WELCOME TO DARCHULA MULTIPLE CAMPUS
+                    </span>
+                    <h2 className="text-2xl font-serif font-black text-slate-900 leading-tight">
+                      Free Student Union - DMC
+                    </h2>
+                    <p className="text-xs font-semibold text-slate-500">
+                      Affiliated to{" "}
+                      <a
+                        href="https://fwu.edu.np"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-red-700 font-bold underline hover:text-red-800 inline-flex items-center gap-0.5"
+                      >
+                        <span>Farwestern University</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </p>
+                    <p className="text-xs text-slate-600 leading-relaxed pt-2">
+                      Darchula Multiple Campus stands as the leading higher educational institution in the far-western district of Darchula. The Free Student Union (FSU) represents the united, democratic voice of students striving to foster academic quality, research culture, student rights, and progressive leadership.
+                    </p>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-5 mt-5 flex items-center justify-between">
+                    <button
+                      onClick={() => navigateTo("about")}
+                      className="px-5 py-2.5 rounded-xl bg-red-700 text-white font-bold text-xs uppercase tracking-wider hover:bg-red-800 transition shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                    >
+                      <span>Explore Institutional Profile</span>
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+
+                    <a
+                      href={settings?.fbCampusPage || "https://facebook.com"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2.5 rounded-xl bg-blue-50 text-blue-900 hover:bg-blue-100 transition flex items-center gap-1.5 text-xs font-bold shadow-sm"
+                      title="Official Facebook Page"
+                    >
+                      <Facebook className="w-4 h-4 text-blue-800" />
+                      <span className="hidden sm:inline">Facebook</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* News & Scrolling Deck */}
+              <NewsSection
+                news={news}
+                selectedNewsId={selectedNewsId}
+                setSelectedNewsId={setSelectedNewsId}
+              />
+            </section>
+
+            {/* MESSAGES SECTION */}
+            <section id="messages-deck" className="border-t border-slate-100 pt-16">
+              <MessagesSection settings={settings} president={president} />
+            </section>
+
+            {/* QUICK DIRECTORY SHORTCUTS */}
+            <section className="bg-gradient-to-br from-slate-900 to-blue-950 text-white p-8 md:p-10 rounded-3xl shadow-md grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <h3 className="font-serif font-black text-amber-400 text-lg">Campus Portal</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Quick access to all essential directories, syllabus archives, grievance channels, and academic administration.
                 </p>
               </div>
 
-              <div className="border-t border-slate-50 pt-4 mt-4 flex items-center justify-between">
-                <button
-                  onClick={() => handleNavClick("about")}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-900 transition shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                >
-                  <span>{lang === "en" ? "Explore About FSU" : "स्ववियुबारे विस्तृतमा"}</span>
-                  <ArrowDown className="w-4 h-4 animate-bounce" />
-                </button>
-
-                <a
-                  href={settings?.fbCampusPage || "https://facebook.com"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition flex items-center gap-1 text-xs font-bold shadow-sm"
-                  title="Official FB Page"
-                >
-                  <Facebook className="w-4 h-4" />
-                  <span className="hidden sm:inline">Facebook</span>
-                </a>
+              <div
+                onClick={() => navigateTo("campus-staff")}
+                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
+              >
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Directory</span>
+                  <h4 className="font-bold text-sm text-white mt-1">Campus Staff Directory</h4>
+                </div>
+                <span className="text-[11px] text-blue-200 mt-2">View 8 key administrative staff →</span>
               </div>
-            </div>
+
+              <div
+                onClick={() => navigateTo("professors")}
+                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
+              >
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Faculty</span>
+                  <h4 className="font-bold text-sm text-white mt-1">Professors & Academic Directory</h4>
+                </div>
+                <span className="text-[11px] text-blue-200 mt-2">BBS, B.Ed, BA faculty members →</span>
+              </div>
+
+              <div
+                onClick={() => navigateTo("fsu-helpdesk")}
+                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
+              >
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Student Support</span>
+                  <h4 className="font-bold text-sm text-white mt-1">Unique FSU Helpdesk</h4>
+                </div>
+                <span className="text-[11px] text-blue-200 mt-2">FAQs & student ticket submission →</span>
+              </div>
+            </section>
+
+            {/* SYLLABUS & NOTES PREVIEW */}
+            <section id="syllabus" className="border-t border-slate-100 pt-16">
+              <DownloadsSection downloads={downloads} />
+            </section>
+
+            {/* FSU TEAM SECTION */}
+            <section id="team" className="border-t border-slate-100 pt-16">
+              <div className="text-center max-w-xl mx-auto mb-10">
+                <span className="text-xs font-bold uppercase tracking-widest text-red-700 block mb-1">
+                  EXECUTIVE COMMITTEE
+                </span>
+                <h3 className="text-2xl font-serif font-black text-slate-900 mb-2">
+                  Meet Our Student Representatives
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Democratically elected FSU members working for the welfare, rights, and higher education standards of Darchula Multiple Campus.
+                </p>
+              </div>
+              <TeamSection team={team} />
+            </section>
+
+            {/* STUDENT BLOGS PREVIEW */}
+            <section id="blogs" className="border-t border-slate-100 pt-16">
+              <BlogsSection
+                blogs={blogs}
+                selectedBlogId={selectedBlogId}
+                setSelectedBlogId={setSelectedBlogId}
+              />
+            </section>
+
+            {/* CONTACT SECTION */}
+            <section id="contact" className="border-t border-slate-100 pt-16">
+              <ContactSection />
+            </section>
           </div>
+        )}
 
-          {/* Core Recent News details and Scrolling Notice deck */}
-          <NewsSection
-            news={news}
-            lang={lang}
-            selectedNewsId={selectedNewsId}
-            setSelectedNewsId={setSelectedNewsId}
-          />
-        </section>
-
-        {/* SECTION 2: ABOUT FSU & ABOUT CAMPUS SCREEN */}
-        <section id="about" className="scroll-mt-16 border-t border-gray-100/80 pt-16">
-          <AboutSection settings={settings} lang={lang} />
-          
-          <div className="mt-16">
-            {/* Split messages from President & Campus chief */}
-            <MessagesSection settings={settings} lang={lang} />
-          </div>
-        </section>
-
-        {/* SECTION 3: ACADEMIC FILES AND SYLLABUS SCREEN */}
-        <section id="syllabus" className="scroll-mt-16 border-t border-gray-100/80 pt-16">
-          <DownloadsSection downloads={downloads} lang={lang} />
-        </section>
-
-        {/* SECTION 4: MEET FSU EXECUTIVE BOARD MEMBERS */}
-        <section id="team" className="scroll-mt-16 border-t border-gray-100/80 pt-16">
-          <div className="text-center max-w-xl mx-auto mb-10">
-            <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 block mb-1">
-              {lang === "en" ? "FSU COMMITTEE" : "कार्यकारिणी समिति"}
-            </span>
-            <h3 className="text-2xl font-extrabold text-gray-900 mb-2">
-              {lang === "en" ? "Meet Our Student Representatives" : "हाम्रो कार्यसमितिका सदस्यहरू"}
-            </h3>
-            <p className="text-sm text-gray-500">
-              {lang === "en"
-                ? "Democratically elected FSU members working for the welfare, rights, and standard higher education of Darchula Multiple Campus."
-                : "दार्चुला बहुमुखी क्याम्पसका विद्यार्थीहरूको प्रतिनिधित्व गर्ने निर्वाचित पदाधिकारी तथा स्ववियु सदस्यहरू।"}
-            </p>
-          </div>
-          <TeamSection team={team} lang={lang} />
-        </section>
-
-        {/* SECTION 5: STUDENT WRITINGS / BLOGS SCREEN */}
-        <section id="blogs" className="scroll-mt-16 border-t border-gray-100/80 pt-16">
-          <BlogsSection
+        {/* INDIVIDUAL SUB-PAGES */}
+        {currentRoute === "about" && <AboutPage settings={settings} president={president} />}
+        {currentRoute === "syllabus-notes" && <SyllabusPage downloads={downloads} />}
+        {currentRoute === "fsu-team" && <TeamPage team={team} />}
+        {currentRoute === "student-blogs" && (
+          <BlogsPage
             blogs={blogs}
-            lang={lang}
             selectedBlogId={selectedBlogId}
             setSelectedBlogId={setSelectedBlogId}
           />
-        </section>
-
-        {/* SECTION 6: COMPLAINTS / FEEDBACK CONTACT SCREEN */}
-        <section id="contact" className="scroll-mt-16 border-t border-gray-100/80 pt-16">
-          <ContactSection lang={lang} />
-        </section>
-
+        )}
+        {currentRoute === "contact" && <ContactPage />}
+        {currentRoute === "campus-staff" && <CampusStaffPage />}
+        {currentRoute === "professors" && <ProfessorsPage />}
+        {currentRoute === "fsu-helpdesk" && <HelpdeskPage />}
+        {currentRoute === "contact-secretariat" && <SecretariatPage />}
+        {currentRoute === "privacy-policy" && (
+          <PrivacyPolicyPage
+            settings={settings}
+            onGoToCMS={() => navigateTo("campuslogin")}
+          />
+        )}
+        {currentRoute === "terms-and-conditions" && (
+          <TermsPage
+            settings={settings}
+            onGoToCMS={() => navigateTo("campuslogin")}
+          />
+        )}
       </main>
 
       {/* Main Footer layout */}
-      <Footer settings={settings} lang={lang} />
+      <Footer settings={settings} onNavigate={(slug) => navigateTo(slug as RouteType)} />
     </div>
   );
 }

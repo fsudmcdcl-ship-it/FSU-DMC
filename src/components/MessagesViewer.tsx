@@ -6,7 +6,7 @@ import { ContactSubmission } from "../types";
 import { Lock, MailOpen, Trash2, ShieldCheck, LogOut, Loader2, Calendar, User, Eye, EyeOff, Mail } from "lucide-react";
 
 interface MessagesViewerProps {
-  lang: "en" | "np";
+  lang?: "en" | "np";
   onGoHome: () => void;
 }
 
@@ -149,7 +149,7 @@ export default function MessagesViewer({ lang, onGoHome }: MessagesViewerProps) 
             {lang === "en" ? "Restricted FSU Inbox" : "गोप्य सन्देश बक्स"}
           </h3>
           <p className="text-xs text-gray-400 font-mono uppercase tracking-wider mb-5">
-            fsudmc.edu.np/databasemessage2083
+            fsudmc.amitjoshi.info.np/databasemessage2083
           </p>
           <p className="text-xs text-gray-500 mb-6 text-center leading-relaxed">
             {lang === "en"

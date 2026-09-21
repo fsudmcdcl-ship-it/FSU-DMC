@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import { GeneralSettings } from "../types";
+import { GeneralSettings, TeamMember } from "../types";
 import { Quote, X } from "lucide-react";
 
 interface MessagesSectionProps {
   settings: GeneralSettings;
-  lang: "en" | "np";
+  president?: TeamMember;
+  lang?: "en" | "np";
 }
 
-export default function MessagesSection({ settings, lang }: MessagesSectionProps) {
+export default function MessagesSection({ settings, president }: MessagesSectionProps) {
   const [modalTitle, setModalTitle] = useState("");
   const [modalBody, setModalBody] = useState("");
   const [modalName, setModalName] = useState("");
@@ -20,122 +21,121 @@ export default function MessagesSection({ settings, lang }: MessagesSectionProps
     setModalPhoto(photo);
   };
 
+  const presidentName = president?.nameEn || settings?.presidentNameEn || "Amit Joshi";
+  const presidentPhoto = president?.imageUrl || settings?.presidentPhoto || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200";
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       {/* Box 1: Message from FSU President */}
-      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-md border border-gray-100 flex flex-col justify-between hover:shadow-lg transition relative overflow-hidden">
-        {/* Subtle decorative quotation mark */}
-        <Quote className="absolute right-6 top-6 w-16 h-16 text-emerald-100 -z-0 pointer-events-none" />
+      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition relative overflow-hidden">
+        <Quote className="absolute right-6 top-6 w-16 h-16 text-emerald-100 pointer-events-none" />
 
         <div className="relative z-10">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 block mb-3">
-            {lang === "en" ? "FSU MESSAGE BOARD" : "स्ववियु सन्देश स्तम्भ"}
+          <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 block mb-2">
+            FSU MESSAGE BOARD
           </span>
-          <h3 className="text-xl font-bold text-gray-900 mb-6 pb-2 border-b border-gray-100">
-            {lang === "en" ? "Message From FSU President" : "स्ववियु सभापतिको सन्देश"}
+          <h3 className="text-xl font-serif font-black text-slate-900 mb-6 pb-2 border-b border-slate-100">
+            Message From FSU President
           </h3>
 
           <div className="flex items-center gap-4 mb-4">
             <img
-              src={settings?.presidentPhoto || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200"}
+              src={presidentPhoto}
               alt="FSU President"
-              className="w-16 h-16 rounded-full object-cover shadow-inner border-2 border-emerald-500"
+              className="w-16 h-16 rounded-full object-cover shadow-inner border-2 border-emerald-600"
               referrerPolicy="no-referrer"
             />
             <div>
-              <h4 className="font-extrabold text-gray-900">
-                {lang === "en" ? settings?.presidentNameEn : settings?.presidentNameNp}
-              </h4>
-              <p className="text-xs text-gray-500 font-medium">
-                {lang === "en" ? "President, Free Student Union" : "सभापति, स्वतन्त्र विद्यार्थी युनियन"}
+              <h4 className="font-extrabold text-slate-900">{presidentName}</h4>
+              <p className="text-xs text-slate-500 font-medium">
+                President, Free Student Union - DMC
               </p>
             </div>
           </div>
 
-          {/* Clamped to exactly 5 lines of preview */}
-          <p className="text-sm text-gray-600 leading-relaxed line-clamp-[5] mb-6 font-sans whitespace-pre-line italic">
-            "{lang === "en" ? settings?.presidentMessageEn : settings?.presidentMessageNp}"
+          <p className="text-sm text-slate-600 leading-relaxed line-clamp-[5] mb-6 font-sans whitespace-pre-line italic">
+            "{settings?.presidentMessageEn ||
+              "Dear fellow students, as the President of Free Student Union - DMC, I extend my heartfelt welcome. Our union remains firmly dedicated to upholding academic transparency, equal opportunity for all, student welfare funds, and active engagement with campus leadership."}"
           </p>
         </div>
 
         <button
           onClick={() =>
             handleReadMore(
-              lang === "en" ? "Message From FSU President" : "स्ववियु सभापतिको सन्देश",
-              lang === "en" ? settings?.presidentNameEn : settings?.presidentNameNp,
-              lang === "en" ? settings?.presidentMessageEn : settings?.presidentMessageNp,
-              settings?.presidentPhoto
+              "Message From FSU President",
+              presidentName,
+              settings?.presidentMessageEn ||
+                "Dear fellow students, as the President of Free Student Union - DMC, I extend my heartfelt welcome. Our union remains firmly dedicated to upholding academic transparency, equal opportunity for all, student welfare funds, and active engagement with campus leadership.",
+              presidentPhoto
             )
           }
-          className="self-start px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-100 font-bold text-xs uppercase tracking-wider transition-all"
+          className="self-start px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
         >
-          {lang === "en" ? "Read Message" : "सन्देश पढ्नुहोस्"}
+          Read Full Message
         </button>
       </div>
 
       {/* Box 2: Message from Campus Chief */}
-      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-md border border-gray-100 flex flex-col justify-between hover:shadow-lg transition relative overflow-hidden">
-        {/* Subtle decorative quotation mark */}
-        <Quote className="absolute right-6 top-6 w-16 h-16 text-blue-100 -z-0 pointer-events-none" />
+      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition relative overflow-hidden">
+        <Quote className="absolute right-6 top-6 w-16 h-16 text-blue-100 pointer-events-none" />
 
         <div className="relative z-10">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 block mb-3">
-            {lang === "en" ? "CAMPUS EXECUTIVE CHIEF BOARD" : "क्याम्पस प्रमुख सन्देश स्तम्भ"}
+          <span className="text-xs font-bold uppercase tracking-widest text-blue-900 block mb-2">
+            CAMPUS EXECUTIVE BOARD
           </span>
-          <h3 className="text-xl font-bold text-gray-900 mb-6 pb-2 border-b border-gray-100">
-            {lang === "en" ? "Message From Campus Chief" : "क्याम्पस प्रमुखको सन्देश"}
+          <h3 className="text-xl font-serif font-black text-slate-900 mb-6 pb-2 border-b border-slate-100">
+            Message From Campus Chief
           </h3>
 
           <div className="flex items-center gap-4 mb-4">
             <img
               src={settings?.chiefPhoto || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200"}
               alt="Campus Chief"
-              className="w-16 h-16 rounded-full object-cover shadow-inner border-2 border-blue-500"
+              className="w-16 h-16 rounded-full object-cover shadow-inner border-2 border-blue-900"
               referrerPolicy="no-referrer"
             />
             <div>
-              <h4 className="font-extrabold text-gray-900">
-                {lang === "en" ? settings?.chiefNameEn : settings?.chiefNameNp}
-              </h4>
-              <p className="text-xs text-gray-500 font-medium">
-                {lang === "en" ? "Campus Chief, DMC" : "क्याम्पस प्रमुख, दार्चुला बहुमुखी क्याम्पस"}
+              <h4 className="font-extrabold text-slate-900">{settings?.chiefNameEn || "Campus Chief"}</h4>
+              <p className="text-xs text-slate-500 font-medium">
+                Campus Chief, Darchula Multiple Campus
               </p>
             </div>
           </div>
 
-          {/* Clamped to exactly 5 lines of preview */}
-          <p className="text-sm text-gray-600 leading-relaxed line-clamp-[5] mb-6 font-sans whitespace-pre-line italic">
-            "{lang === "en" ? settings?.chiefMessageEn : settings?.chiefMessageNp}"
+          <p className="text-sm text-slate-600 leading-relaxed line-clamp-[5] mb-6 font-sans whitespace-pre-line italic">
+            "{settings?.chiefMessageEn ||
+              "Darchula Multiple Campus stands proud as a beacon of learning in Sudurpashchim. We encourage intellectual curiosity, academic rigor, and democratic student participation in all campus affairs."}"
           </p>
         </div>
 
         <button
           onClick={() =>
             handleReadMore(
-              lang === "en" ? "Message From Campus Chief" : "क्याम्पस प्रमुखको सन्देश",
-              lang === "en" ? settings?.chiefNameEn : settings?.chiefNameNp,
-              lang === "en" ? settings?.chiefMessageEn : settings?.chiefMessageNp,
-              settings?.chiefPhoto
+              "Message From Campus Chief",
+              settings?.chiefNameEn || "Campus Chief",
+              settings?.chiefMessageEn ||
+                "Darchula Multiple Campus stands proud as a beacon of learning in Sudurpashchim. We encourage intellectual curiosity, academic rigor, and democratic student participation in all campus affairs.",
+              settings?.chiefPhoto || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200"
             )
           }
-          className="self-start px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-100 font-bold text-xs uppercase tracking-wider transition-all"
+          className="self-start px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200/80 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
         >
-          {lang === "en" ? "Read Message" : "सन्देश पढ्नुहोस्"}
+          Read Full Message
         </button>
       </div>
 
       {/* DETAILED MESSAGE POPUP MODAL */}
       {modalTitle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col relative border border-gray-100">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col relative border border-slate-100">
             {/* Header */}
-            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h4 className="text-xs font-bold font-mono text-gray-500 uppercase tracking-widest">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white">
+              <h4 className="text-xs font-bold font-mono text-amber-300 uppercase tracking-widest">
                 ✉️ {modalTitle}
               </h4>
               <button
                 onClick={() => setModalTitle("")}
-                className="p-1.5 rounded-full hover:bg-gray-200 text-gray-500 transition"
+                className="p-1.5 rounded-full hover:bg-white/20 text-white transition cursor-pointer"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -147,27 +147,27 @@ export default function MessagesSection({ settings, lang }: MessagesSectionProps
                 <img
                   src={modalPhoto}
                   alt={modalName}
-                  className="w-24 h-24 rounded-full object-cover border-4 border-emerald-50 shadow-md mb-3"
+                  className="w-24 h-24 rounded-full object-cover border-4 border-slate-100 shadow-md mb-3"
                   referrerPolicy="no-referrer"
                 />
-                <h3 className="text-lg font-extrabold text-gray-900">{modalName}</h3>
-                <p className="text-xs text-gray-500 font-mono italic">
+                <h3 className="text-lg font-serif font-black text-slate-900">{modalName}</h3>
+                <p className="text-xs text-slate-500 font-mono italic">
                   {modalTitle} | Darchula Multiple Campus
                 </p>
               </div>
 
-              <p className="text-sm md:text-base text-gray-700 leading-relaxed font-sans whitespace-pre-line bg-gray-50 p-5 rounded-2xl border border-gray-100 italic">
+              <p className="text-sm md:text-base text-slate-700 leading-relaxed font-sans whitespace-pre-line bg-slate-50 p-5 rounded-2xl border border-slate-100 italic">
                 "{modalBody}"
               </p>
             </div>
 
             {/* Footer Closure */}
-            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => setModalTitle("")}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition"
+                className="px-5 py-2 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
               >
-                {lang === "en" ? "Done" : "भयो"}
+                Done
               </button>
             </div>
           </div>

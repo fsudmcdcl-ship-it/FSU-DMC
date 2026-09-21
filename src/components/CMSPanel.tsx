@@ -9,7 +9,7 @@ import {
 
 interface CMSPanelProps {
   state: DatabaseState;
-  lang: "en" | "np";
+  lang?: "en" | "np";
   onGoHome: () => void;
   onGoMessages: () => void;
 }
@@ -252,7 +252,7 @@ export default function CMSPanel({ state, lang, onGoHome, onGoMessages }: CMSPan
             FSU CMS Control Center
           </h3>
           <p className="text-xs text-slate-400 font-mono tracking-wider uppercase mb-5">
-            fsudmc.edu.np/campuslogin
+            fsudmc.amitjoshi.info.np/campuslogin
           </p>
 
           <p className="text-xs text-gray-500 mb-6 text-center leading-relaxed">

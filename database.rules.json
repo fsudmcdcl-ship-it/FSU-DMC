@@ -31,7 +31,7 @@
     "contacts": {
       ".read": "auth != null",
       "$contact_id": {
-        ".write": "!data.exists() && newData.exists()"
+        ".write": "auth != null || (!data.exists() && newData.exists())"
       }
     }
   }
