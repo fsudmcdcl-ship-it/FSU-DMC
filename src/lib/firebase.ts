@@ -6,15 +6,14 @@ import { DatabaseState } from "../types";
 // Firebase configuration using environment variables or safe public configuration for DMC
 const env = (import.meta as any).env || {};
 const firebaseConfig = {
- apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyCSbIo5RUS0OZ_-sGuSjFHOy5P7knYWPeY",
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "fsudmc-portal.firebaseapp.com",
-  databaseURL: env.VITE_FIREBASE_DATABASE_URL || "https://fsudmc-portal-default-rtdb.firebaseio.com",
-  projectId: env.VITE_FIREBASE_PROJECT_ID || "fsudmc-portal",
-  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "fsudmc-portal.appspot.com",
-  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "102938475612",
-  appId: env.VITE_FIREBASE_APP_ID || "1:102938475612:web:abcdef1234567890",
+  apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyCSbIo5RUS0OZ_-sGuSjFHOy5P7knYWPeY",
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "fsu-bdbf6.firebaseapp.com",
+  databaseURL: env.VITE_FIREBASE_DATABASE_URL || "https://fsu-bdbf6-default-rtdb.firebaseio.com",
+  projectId: env.VITE_FIREBASE_PROJECT_ID || "fsu-bdbf6",
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "fsu-bdbf6.appspot.com",
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "214528113668",
+  appId: env.VITE_FIREBASE_APP_ID || "1:214528113668:web:abcdef1234567890",
 };
-
 // Initialize Firebase App
 export const firebaseApp = initializeApp(firebaseConfig);
 
