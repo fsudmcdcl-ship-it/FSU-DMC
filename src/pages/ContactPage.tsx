@@ -49,6 +49,7 @@ export default function ContactPage() {
             </p>
             <div className="space-y-2 font-mono bg-slate-50 p-4 rounded-2xl border border-slate-100">
               <p><strong>Physical Address:</strong> Khalanga, Mahakali Municipality, Darchula District, Sudurpashchim Province, Nepal</p>
+              <p><strong>Urgent Helpline:</strong> <a href="tel:9741823122" className="text-emerald-700 underline font-bold font-mono">9741823122</a></p>
               <p><strong>Official Base Domain:</strong> <a href="https://fsudmc.com" className="text-blue-900 underline">https://fsudmc.com</a></p>
               <p><strong>Official Contact Email:</strong> <a href="mailto:info@fsudmc.com" className="text-blue-900 underline">info@fsudmc.com</a></p>
               <p><strong>University Affiliation:</strong> <a href="https://fwu.edu.np" target="_blank" rel="noopener noreferrer" className="text-red-700 underline font-bold">Farwestern University (fwu.edu.np)</a></p>

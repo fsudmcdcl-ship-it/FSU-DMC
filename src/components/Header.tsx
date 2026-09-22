@@ -73,10 +73,7 @@ export default function Header({
             >
               <img
                 id="header-logo"
-                src={
-                  settings?.logoUrl ||
-                  "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200"
-                }
+                src={settings?.logoUrl || "/logo.png"}
                 alt="Free Student Union - DMC Logo"
                 className="w-14 h-14 object-cover rounded-full shadow-md border-2 border-red-700 ring-2 ring-red-50 group-hover:scale-105 transition-transform"
                 referrerPolicy="no-referrer"

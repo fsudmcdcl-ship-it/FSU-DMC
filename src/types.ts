@@ -122,16 +122,18 @@ export interface ComplaintTrackingSettings {
   supportEmail?: string;
 }
 
-export type AdminRole = "master" | "secondary";
+export type AdminRole = "master" | "secondary" | "reviewer";
 
 export interface SystemAdmin {
   id: string;
   username: string;
-  password: string;
+  password?: string;
   role: AdminRole;
   fullName: string;
   createdAt: number;
   lastLogin?: number;
+  status?: "active" | "locked" | "disabled";
+  failedAttempts?: number;
 }
 
 export interface StaffItem {

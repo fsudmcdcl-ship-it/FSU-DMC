@@ -4,6 +4,7 @@ import { rtdb } from "../lib/firebase";
 import { saveTrackedComplaint } from "../lib/dataService";
 import {
   Mail,
+  Phone,
   CheckCircle,
   Send,
   UserCheck,
@@ -131,6 +132,10 @@ export default function ContactSection({ onOpenTracker }: ContactSectionProps) {
             <div className="flex items-start gap-2.5">
               <MapPin className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
               <span>FSU Secretariat, Darchula Multiple Campus, Khalanga, Darchula</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Urgent Helpline: <a href="tel:9741823122" className="text-amber-300 font-bold font-mono hover:underline">9741823122</a></span>
             </div>
             <div className="flex items-center gap-2.5">
               <Mail className="w-4 h-4 text-amber-400 shrink-0" />

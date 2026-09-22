@@ -244,17 +244,18 @@ export const DEFAULT_DB_STATE: DatabaseState = {
     headingEn: "FSU Student Complaint & Inquiry Tracker",
     subtitleEn: "Track the official review condition, workflow status, and FSU Secretariat remarks for your submissions in real time.",
     instructionsEn: "Enter your unique 10-character Tracking Code (e.g., FSU-COMP-XXXXXX) provided during complaint submission.",
-    supportPhone: "+977 9848712345",
+    supportPhone: "9741823122",
     supportEmail: "info@fsudmc.com",
   },
   admins: {
     "admin_master": {
       id: "admin_master",
       username: "dmcadmin",
-      password: "Admin",
       role: "master",
       fullName: "Master Administrator (DMC)",
       createdAt: 1770000000000,
+      status: "active",
+      failedAttempts: 0,
     }
   },
   staff: {

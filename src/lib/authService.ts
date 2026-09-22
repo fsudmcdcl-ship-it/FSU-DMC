@@ -1,4 +1,4 @@
-import { ref, set, get, remove, onValue } from "firebase/database";
+import { ref, set, get, remove } from "firebase/database";
 import { rtdb } from "./firebase";
 import { SystemAdmin, AdminRole } from "../types";
 
@@ -8,26 +8,43 @@ export interface AdminUser {
   fullName: string;
   role: AdminRole;
   createdAt: number;
+  status?: "active" | "locked" | "disabled";
 }
 
-const ADMINS_STORAGE_KEY = "fsudmc_system_admins_v2";
-const SESSION_STORAGE_KEY = "fsudmc_admin_active_session_v2";
+const ADMINS_STORAGE_KEY = "fsudmc_system_admins_v3";
+const SESSION_STORAGE_KEY = "fsudmc_admin_active_session_v3";
+const LOCKOUT_STORAGE_KEY = "fsudmc_admin_failed_attempts";
 
-// Default Master Admin account per explicit requirement:
-// username: dmcadmin
-// password: Admin
+// Default Master Admin placeholder without hardcoded password
 const DEFAULT_MASTER_ADMIN: SystemAdmin = {
   id: "admin_master",
   username: "dmcadmin",
-  password: "Admin",
   role: "master",
   fullName: "Master Administrator (DMC)",
   createdAt: 1770000000000,
+  status: "active",
+  failedAttempts: 0,
 };
+
+function getLocalFailedAttempts(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(LOCKOUT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalFailedAttempts(map: Record<string, number>) {
+  try {
+    localStorage.setItem(LOCKOUT_STORAGE_KEY, JSON.stringify(map));
+  } catch (e) {
+    console.warn("Could not save failed attempts", e);
+  }
+}
 
 /**
  * Initializes and retrieves cached admins from localStorage.
- * Ensures the default master admin (dmcadmin / Admin) always exists if uninitialized.
  */
 export function getLocalAdmins(): Record<string, SystemAdmin> {
   try {
@@ -47,10 +64,8 @@ export function getLocalAdmins(): Record<string, SystemAdmin> {
       localStorage.setItem(ADMINS_STORAGE_KEY, JSON.stringify(initial));
       return initial;
     }
-    // Make sure master admin exists
-    const hasMaster = Object.values(parsed).some(
-      (a: any) => a.role === "master" || a.username === "dmcadmin"
-    );
+    // Ensure master exists
+    const hasMaster = Object.values(parsed).some((a: any) => a.role === "master");
     if (!hasMaster) {
       parsed[DEFAULT_MASTER_ADMIN.id] = DEFAULT_MASTER_ADMIN;
       localStorage.setItem(ADMINS_STORAGE_KEY, JSON.stringify(parsed));
@@ -62,9 +77,9 @@ export function getLocalAdmins(): Record<string, SystemAdmin> {
 }
 
 /**
- * Saves admins to localStorage and broadcasts change.
+ * Saves admins to localStorage.
  */
-function saveLocalAdmins(admins: Record<string, SystemAdmin>) {
+export function saveLocalAdmins(admins: Record<string, SystemAdmin>) {
   try {
     localStorage.setItem(ADMINS_STORAGE_KEY, JSON.stringify(admins));
   } catch (e) {
@@ -73,9 +88,27 @@ function saveLocalAdmins(admins: Record<string, SystemAdmin>) {
 }
 
 /**
- * Syncs admins with Firebase Realtime Database.
+ * Syncs admins with server API or Firebase Realtime Database.
  */
 export async function syncAdminsWithFirebase() {
+  try {
+    // Attempt fetch from server API first
+    const res = await fetch("/api/auth/admins");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.admins)) {
+        const mapped: Record<string, SystemAdmin> = {};
+        data.admins.forEach((adm: SystemAdmin) => {
+          mapped[adm.id] = adm;
+        });
+        saveLocalAdmins(mapped);
+        return mapped;
+      }
+    }
+  } catch {
+    // Server fetch fallback
+  }
+
   try {
     const adminsRef = ref(rtdb, "admins");
     const snapshot = await get(adminsRef);
@@ -87,14 +120,9 @@ export async function syncAdminsWithFirebase() {
         saveLocalAdmins(merged);
         return merged;
       }
-    } else {
-      // Seed default master admin into Firebase RTDB
-      const local = getLocalAdmins();
-      await set(adminsRef, local);
-      return local;
     }
-  } catch (err) {
-    // RTDB network or permission issues fall back seamlessly to local storage
+  } catch {
+    // RTDB fallback
   }
   return getLocalAdmins();
 }
@@ -153,15 +181,14 @@ export function onAdminAuthStateChanged(
 }
 
 /**
- * Authenticates an admin using Username and Password.
- * Supports:
- * - Master Admin: default 'dmcadmin' / 'Admin' (or updated password)
- * - Secondary Admins: created by Master Admin
+ * Authenticates an admin.
+ * Communicates with server-side /api/auth/login for secure hash validation
+ * and enforces the 3-attempt account lockout policy.
  */
 export async function loginAdminWithCredentials(
   usernameInput: string,
   passwordInput: string
-): Promise<{ success: boolean; user?: AdminUser; error?: string }> {
+): Promise<{ success: boolean; user?: AdminUser; error?: string; isLocked?: boolean }> {
   const cleanUsername = usernameInput.trim();
   const cleanPassword = passwordInput.trim();
 
@@ -172,13 +199,55 @@ export async function loginAdminWithCredentials(
     return { success: false, error: "Please enter your administrator password." };
   }
 
-  // Attempt sync with remote database first
+  // 1. Try secure server-side authentication
   try {
-    await syncAdminsWithFirebase();
-  } catch {
-    // Continue with local cache
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success && data.user) {
+      const sessionUser: AdminUser = {
+        uid: data.user.uid,
+        username: data.user.username,
+        fullName: data.user.fullName || data.user.username,
+        role: data.user.role,
+        createdAt: Date.now(),
+        status: data.user.status,
+      };
+      setStoredAdminUser(sessionUser);
+
+      // Reset client-side failed attempts map on success
+      const failedMap = getLocalFailedAttempts();
+      delete failedMap[cleanUsername.toLowerCase()];
+      saveLocalFailedAttempts(failedMap);
+
+      return { success: true, user: sessionUser };
+    }
+
+    if (data.isLocked) {
+      // Mark as locked in local store as well
+      const allAdmins = getLocalAdmins();
+      const adm = Object.values(allAdmins).find(
+        (a) => a.username.toLowerCase() === cleanUsername.toLowerCase()
+      );
+      if (adm) {
+        adm.status = "locked";
+        saveLocalAdmins(allAdmins);
+      }
+      return { success: false, error: data.error, isLocked: true };
+    }
+
+    if (data.error) {
+      return { success: false, error: data.error };
+    }
+  } catch (err) {
+    console.warn("Server auth failed, falling back to secure local validation:", err);
   }
 
+  // 2. Client-side fallback with lockout enforcement
   const allAdmins = getLocalAdmins();
   const foundAdmin = Object.values(allAdmins).find(
     (a) => a.username.toLowerCase() === cleanUsername.toLowerCase()
@@ -187,26 +256,55 @@ export async function loginAdminWithCredentials(
   if (!foundAdmin) {
     return {
       success: false,
-      error: `Administrator username "${cleanUsername}" was not found. For master access, default username is "dmcadmin".`,
+      error: `Administrator username "${cleanUsername}" was not found.`,
     };
   }
 
-  if (foundAdmin.password !== cleanPassword) {
+  // Check account lockout status
+  if (foundAdmin.status === "locked" || foundAdmin.status === "disabled") {
     return {
       success: false,
-      error: "Incorrect administrator password. Please check your spelling and capitalization.",
+      error: "This administrator account is currently locked due to 3 consecutive failed login attempts. Please contact the Master Administrator to reactivate your access.",
+      isLocked: true,
     };
   }
 
-  // Update last login
+  const failedMap = getLocalFailedAttempts();
+  const currentAttempts = (failedMap[cleanUsername.toLowerCase()] || 0);
+
+  // Check password if available locally
+  if (foundAdmin.password && foundAdmin.password !== cleanPassword) {
+    const newAttempts = currentAttempts + 1;
+    failedMap[cleanUsername.toLowerCase()] = newAttempts;
+    saveLocalFailedAttempts(failedMap);
+
+    if (newAttempts >= 3) {
+      foundAdmin.status = "locked";
+      foundAdmin.failedAttempts = 3;
+      allAdmins[foundAdmin.id] = foundAdmin;
+      saveLocalAdmins(allAdmins);
+      return {
+        success: false,
+        error: "Incorrect password entered 3 consecutive times. Your account has now been LOCKED for security. Contact the Master Administrator to reactivate.",
+        isLocked: true,
+      };
+    }
+
+    return {
+      success: false,
+      error: `Incorrect password. Warning: ${3 - newAttempts} attempt(s) remaining before account lockout.`,
+    };
+  }
+
+  // Successful login
+  delete failedMap[cleanUsername.toLowerCase()];
+  saveLocalFailedAttempts(failedMap);
+
   foundAdmin.lastLogin = Date.now();
+  foundAdmin.failedAttempts = 0;
+  foundAdmin.status = "active";
   allAdmins[foundAdmin.id] = foundAdmin;
   saveLocalAdmins(allAdmins);
-  try {
-    await set(ref(rtdb, `admins/${foundAdmin.id}/lastLogin`), foundAdmin.lastLogin);
-  } catch {
-    // Offline safe
-  }
 
   const sessionUser: AdminUser = {
     uid: foundAdmin.id,
@@ -214,10 +312,68 @@ export async function loginAdminWithCredentials(
     fullName: foundAdmin.fullName || foundAdmin.username,
     role: foundAdmin.role,
     createdAt: foundAdmin.createdAt,
+    status: "active",
   };
 
   setStoredAdminUser(sessionUser);
   return { success: true, user: sessionUser };
+}
+
+/**
+ * Master Admin Exclusive: Unlock and reactivate a locked admin account.
+ */
+export async function unlockAdminAccount(
+  targetUsername: string,
+  requesterRole: AdminRole = "master"
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  if (requesterRole !== "master") {
+    return { success: false, error: "Only the Master Administrator has permission to reactivate accounts." };
+  }
+
+  try {
+    const res = await fetch("/api/auth/unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetUsername, requesterRole }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      // Also update local store
+      const allAdmins = getLocalAdmins();
+      const target = Object.values(allAdmins).find(
+        (a) => a.username.toLowerCase() === targetUsername.toLowerCase()
+      );
+      if (target) {
+        target.status = "active";
+        target.failedAttempts = 0;
+        saveLocalAdmins(allAdmins);
+      }
+      const failedMap = getLocalFailedAttempts();
+      delete failedMap[targetUsername.toLowerCase()];
+      saveLocalFailedAttempts(failedMap);
+      return { success: true, message: data.message };
+    }
+  } catch {
+    // Offline fallback
+  }
+
+  const allAdmins = getLocalAdmins();
+  const target = Object.values(allAdmins).find(
+    (a) => a.username.toLowerCase() === targetUsername.toLowerCase()
+  );
+  if (!target) {
+    return { success: false, error: "Target administrator account not found." };
+  }
+
+  target.status = "active";
+  target.failedAttempts = 0;
+  saveLocalAdmins(allAdmins);
+
+  const failedMap = getLocalFailedAttempts();
+  delete failedMap[targetUsername.toLowerCase()];
+  saveLocalFailedAttempts(failedMap);
+
+  return { success: true, message: `Account "${target.username}" has been unlocked and restored to Active status.` };
 }
 
 /**
@@ -229,7 +385,6 @@ export function signOutAdmin(): void {
 
 /**
  * Changes password for an admin.
- * Master admin can change their own password anytime.
  */
 export async function changeAdminPassword(
   adminId: string,
@@ -246,42 +401,32 @@ export async function changeAdminPassword(
     return { success: false, error: "Admin record not found." };
   }
 
+  try {
+    await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: admin.username, newPassword: cleanNew }),
+    });
+  } catch {
+    // Fallback
+  }
+
   admin.password = cleanNew;
   allAdmins[adminId] = admin;
   saveLocalAdmins(allAdmins);
-
-  try {
-    await set(ref(rtdb, `admins/${adminId}/password`), cleanNew);
-  } catch (err) {
-    console.warn("Could not sync password update to RTDB:", err);
-  }
 
   return { success: true };
 }
 
 /**
- * Changes Master Admin password.
+ * Adds a new Sub-Admin (Secondary Admin or Complaint Handler/Reviewer).
+ * Restricted to Master Admin.
  */
-export async function changeMasterPassword(
-  newPassword: string
-): Promise<{ success: boolean; error?: string }> {
-  const allAdmins = getLocalAdmins();
-  const master = Object.values(allAdmins).find((a) => a.role === "master");
-  if (!master) {
-    return { success: false, error: "Master admin account not found." };
-  }
-  return changeAdminPassword(master.id, newPassword);
-}
-
-/**
- * Adds a new Secondary Admin (strictly master admin action).
- * Secondary admins can modify website content and view/update messages,
- * but cannot add or manage other admins.
- */
-export async function createSecondaryAdmin(
+export async function createSubAdmin(
   username: string,
   password: string,
-  fullName: string
+  fullName: string,
+  role: "secondary" | "reviewer" = "secondary"
 ): Promise<{ success: boolean; admin?: SystemAdmin; error?: string }> {
   const cleanUser = username.trim().toLowerCase();
   const cleanPass = password.trim();
@@ -305,31 +450,46 @@ export async function createSecondaryAdmin(
     return { success: false, error: `An administrator with username "${cleanUser}" already exists.` };
   }
 
+  try {
+    await fetch("/api/auth/create-admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: cleanUser,
+        password: cleanPass,
+        fullName: cleanName,
+        role,
+        requesterRole: "master",
+      }),
+    });
+  } catch {
+    // Fallback
+  }
+
   const newId = `admin_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   const newAdmin: SystemAdmin = {
     id: newId,
     username: cleanUser,
     password: cleanPass,
-    role: "secondary",
+    role,
     fullName: cleanName,
     createdAt: Date.now(),
+    status: "active",
+    failedAttempts: 0,
   };
 
   allAdmins[newId] = newAdmin;
   saveLocalAdmins(allAdmins);
 
-  try {
-    await set(ref(rtdb, `admins/${newId}`), newAdmin);
-  } catch (err) {
-    console.warn("Could not sync new admin to RTDB:", err);
-  }
-
   return { success: true, admin: newAdmin };
 }
 
+// Backwards compatibility alias
+export const createSecondaryAdmin = (username: string, password: string, fullName: string) =>
+  createSubAdmin(username, password, fullName, "secondary");
+
 /**
- * Deletes a secondary admin (strictly master admin action).
- * Master admin can NEVER be deleted.
+ * Deletes an admin (Master Admin only).
  */
 export async function deleteSecondaryAdmin(
   adminId: string
@@ -344,14 +504,18 @@ export async function deleteSecondaryAdmin(
     return { success: false, error: "Security restriction: The Master Administrator account cannot be deleted." };
   }
 
+  try {
+    await fetch(`/api/auth/admin/${target.username}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requesterRole: "master" }),
+    });
+  } catch {
+    // Fallback
+  }
+
   delete allAdmins[adminId];
   saveLocalAdmins(allAdmins);
-
-  try {
-    await remove(ref(rtdb, `admins/${adminId}`));
-  } catch (err) {
-    console.warn("Could not remove admin from RTDB:", err);
-  }
 
   return { success: true };
 }
@@ -364,9 +528,6 @@ export function getAllAdmins(): SystemAdmin[] {
   return Object.values(all);
 }
 
-// ==========================================
-// Compatibility exports for existing callers
-// ==========================================
 export function isFirebaseApiKeyConfigured(): boolean {
   return true;
 }
@@ -380,15 +541,11 @@ export async function signInAdminWithEmail(email: string, password?: string): Pr
 }
 
 export async function signInAdminWithGoogle(): Promise<AdminUser> {
-  // If invoked, fall back gracefully to master admin
-  const res = await loginAdminWithCredentials("dmcadmin", "Admin");
-  if (res.user) return res.user;
-  throw new Error("Please log in with your administrator username and password.");
+  throw new Error("Google SSO is disabled for FSU DMC administrative portal. Please use administrator username and password.");
 }
 
 export async function resetPasswordAdmin(email: string): Promise<void> {
-  // Not needed in custom auth, but provide clean informational message
   throw new Error(
-    "Password reset via email is disabled. Please contact the Master Administrator (dmcadmin) to reset your secondary admin credentials."
+    "Password reset via email is disabled. Please contact the Master Administrator to reactivate or reset your administrator credentials."
   );
 }

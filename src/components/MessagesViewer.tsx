@@ -52,8 +52,8 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
   const [loginLoading, setLoginLoading] = useState(false);
 
   // Username and Password Login States (Custom Admin System)
-  const [username, setUsername] = useState("dmcadmin");
-  const [password, setPassword] = useState("Admin");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   // Filter state
@@ -196,7 +196,8 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
       (statusFilter === "pending" && s === "pending") ||
       (statusFilter === "review" && (s.includes("review") || s.includes("verified"))) ||
       (statusFilter === "progress" && (s.includes("progress") || s.includes("action"))) ||
-      (statusFilter === "resolved" && (s.includes("resolved") || s.includes("closed")));
+      (statusFilter === "resolved" && (s.includes("resolved") || s.includes("closed"))) ||
+      (statusFilter === "rejected" && (s.includes("reject") || s.includes("denied")));
 
     const query = searchQuery.trim().toLowerCase();
     const code = (m.trackingCode || m.ticketId || m.id).toLowerCase();
@@ -304,14 +305,6 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
             </button>
           </form>
 
-          {/* Helpful default credentials reminder */}
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-center space-y-1">
-            <span className="text-[11px] font-bold text-slate-700 block">Default Master Admin</span>
-            <span className="text-xs font-mono text-blue-950 block">
-              Username: <strong className="font-black">dmcadmin</strong> &bull; Password: <strong className="font-black">Admin</strong>
-            </span>
-          </div>
-
           <button
             onClick={onGoHome}
             className="w-full py-2 text-slate-500 hover:text-slate-900 text-xs font-bold transition cursor-pointer"
@@ -332,8 +325,18 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
             <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400 font-mono">
               FSU DMC INBOX
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-              {user.role === "master" ? "Master Admin" : "Secondary Admin"}
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+              user.role === "master"
+                ? "bg-amber-400 text-slate-950"
+                : user.role === "reviewer"
+                ? "bg-purple-300 text-purple-950"
+                : "bg-blue-300 text-blue-950"
+            }`}>
+              {user.role === "master"
+                ? "Master Admin"
+                : user.role === "reviewer"
+                ? "Complaint Handler / Reviewer"
+                : "Secondary Admin"}
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl font-serif font-black">
@@ -371,6 +374,7 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
             { id: "review", label: "In Review" },
             { id: "progress", label: "In Progress" },
             { id: "resolved", label: "Resolved" },
+            { id: "rejected", label: "Rejected" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -455,42 +459,74 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
                         Anonymous Student
                       </span>
                     ) : (
-                      <span className="text-xs font-bold text-slate-800">
-                        {item.name || "Student"}
-                        {item.className ? ` • ${item.className}` : ""}
-                        {item.semester ? ` (${item.semester})` : ""}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900">
+                          {item.name || "Student"}
+                        </span>
+                        {((item as any).rollNumber || (item as any).roll) && (
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-mono font-bold border border-slate-200">
+                            Roll: {(item as any).rollNumber || (item as any).roll}
+                          </span>
+                        )}
+                        {(item.className || (item as any).faculty) && (
+                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-900 text-[10px] font-medium border border-blue-100">
+                            {(item as any).faculty || item.className}
+                          </span>
+                        )}
+                        {item.semester && (
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            • {item.semester}
+                          </span>
+                        )}
+                      </div>
                     )}
 
-                    {item.contactInfo && item.contactInfo !== "Confidential" && (
-                      <span className="text-xs text-slate-500 font-mono">
-                        ({item.contactInfo})
-                      </span>
-                    )}
+                    {/* Contact Phone & Email */}
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600 font-mono">
+                      {((item as any).phone || (item.contactInfo && item.contactInfo !== "Confidential")) && (
+                        <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
+                          <Phone className="w-3 h-3 text-slate-400" />
+                          <span>{(item as any).phone || item.contactInfo}</span>
+                        </span>
+                      )}
+                      {(item as any).email && (
+                        <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
+                          <Mail className="w-3 h-3 text-slate-400" />
+                          <span>{(item as any).email}</span>
+                        </span>
+                      )}
+                      {(item.category || (item as any).tag) && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 text-[10px] font-bold border border-amber-200">
+                          {item.category || (item as any).tag}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-auto">
                     <span className="text-[11px] text-slate-400 font-mono">
                       {new Date(item.createdAt || Date.now()).toLocaleString()}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
-                      title="Delete record"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {user.role !== "reviewer" && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+                        title="Delete record (Master/Secondary Admin only)"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Message Body & Image Attachment */}
+                {/* Message Body & Image Attachment - Fully expanded, no truncation */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="md:col-span-2 space-y-3">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                      Student Grievance / Inquiry Details
+                      Student Grievance / Inquiry Details (Complete Text)
                     </span>
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed break-words">
                       {item.message}
                     </div>
 
@@ -520,7 +556,7 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
                     )}
                   </div>
 
-                  {/* Status & Admin Remarks Box (Requirement #3) */}
+                  {/* Status & Admin Remarks Box (Requirement #3 & #4) */}
                   <div className="bg-blue-50/60 rounded-2xl border border-blue-200/80 p-4 space-y-3 flex flex-col justify-between">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -546,6 +582,7 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
                           <option value="In Review">In Review by Secretariat</option>
                           <option value="In Progress">In Progress / Committee Action</option>
                           <option value="Resolved">Resolved & Closed</option>
+                          <option value="Rejected">Rejected / Ineligible</option>
                         </select>
                       </div>
 

@@ -153,7 +153,7 @@ export default function HelpdeskPage({ faqs }: HelpdeskPageProps) {
           </div>
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Emergency Helpline</span>
-            <p className="text-sm font-bold text-slate-900 mt-0.5">+977-9848712345</p>
+            <p className="text-sm font-bold text-slate-900 mt-0.5">9741823122</p>
             <p className="text-xs text-slate-500">24/7 Student Assistance</p>
           </div>
         </div>

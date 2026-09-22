@@ -131,7 +131,7 @@ export default function SecretariatPage() {
                 info@fsudmc.com
               </a>
               <br />
-              Phone: +977-9848712345<br />
+              Phone: 9741823122<br />
               Official Memorandums: secretariat@fsudmc.com
             </p>
           </div>

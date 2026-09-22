@@ -2023,7 +2023,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Emergency Helpline</span>
-                  <p className="text-sm font-bold text-slate-900">+977-9848712345</p>
+                  <p className="text-sm font-bold text-slate-900">9741823122</p>
                   <span className="text-[11px] text-slate-500">Available 24/7 for urgent assistance</span>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">

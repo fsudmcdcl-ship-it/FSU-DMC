@@ -194,42 +194,6 @@ export default function FaqSection({
             })}
           </div>
         )}
-
-        {/* Footer Support Banner */}
-        <div className="rounded-2xl bg-gradient-to-r from-blue-950 via-slate-900 to-blue-950 text-white p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
-          <div className="space-y-1.5 text-center md:text-left">
-            <h4 className="text-base sm:text-lg font-serif font-bold text-white flex items-center justify-center md:justify-start gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" />
-              Did not find your answer?
-            </h4>
-            <p className="text-xs sm:text-sm text-blue-200/90 max-w-xl">
-              Submit your specific question, complaint, or appointment request directly to the Free
-              Student Union Secretariat. You will get a Tracking ID to check status anytime.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {onNavigateSecretariat && (
-              <button
-                type="button"
-                onClick={onNavigateSecretariat}
-                className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer flex items-center gap-2"
-              >
-                <Send className="w-3.5 h-3.5" />
-                Contact Secretariat
-              </button>
-            )}
-            {handleOpenTracker && (
-              <button
-                type="button"
-                onClick={handleOpenTracker}
-                className="px-4 py-2.5 rounded-xl bg-blue-800/80 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider border border-blue-600/60 transition-colors cursor-pointer flex items-center gap-2"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-300" />
-                Track Complaint
-              </button>
-            )}
-          </div>
-        </div>
       </div>
     </section>
   );
