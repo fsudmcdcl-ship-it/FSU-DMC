@@ -96,9 +96,42 @@ export interface ContactSubmission {
   faculty?: string;
   category?: string;
   ticketId?: string;
+  trackingCode?: string;
   tag?: string;
   status?: string;
   subject?: string;
+  imageUrl?: string;
+  adminRemarks?: string;
+  adminRemarkUpdatedAt?: number;
+}
+
+export interface FaqItem {
+  id: string;
+  questionEn: string;
+  answerEn: string;
+  category: string;
+  order: number;
+  isPublished: boolean;
+}
+
+export interface ComplaintTrackingSettings {
+  headingEn: string;
+  subtitleEn: string;
+  instructionsEn: string;
+  supportPhone?: string;
+  supportEmail?: string;
+}
+
+export type AdminRole = "master" | "secondary";
+
+export interface SystemAdmin {
+  id: string;
+  username: string;
+  password: string;
+  role: AdminRole;
+  fullName: string;
+  createdAt: number;
+  lastLogin?: number;
 }
 
 export interface StaffItem {
@@ -150,4 +183,7 @@ export interface DatabaseState {
   importantNotice: ImportantNotice;
   staff?: Record<string, StaffItem>;
   professors?: Record<string, ProfessorItem>;
+  faqs?: Record<string, FaqItem>;
+  trackingSettings?: ComplaintTrackingSettings;
+  admins?: Record<string, SystemAdmin>;
 }

@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { ref, set, remove, push } from "firebase/database";
+import { rtdb } from "../lib/firebase";
+import { saveNode, saveSubItem, deleteSubItem } from "../lib/dataService";
 import {
-  signInWithPopup,
-  GoogleAuthProvider,
-  signOut,
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail
-} from "firebase/auth";
-import { rtdb, auth } from "../lib/firebase";
+  AdminUser,
+  onAdminAuthStateChanged,
+  signInAdminWithEmail,
+  signInAdminWithGoogle,
+  signOutAdmin,
+  resetPasswordAdmin,
+  getCurrentAdminUser,
+  isFirebaseApiKeyConfigured,
+  loginAdminWithCredentials
+} from "../lib/authService";
+import ImageUploadInput from "./ImageUploadInput";
+import FaqManager from "./cms/FaqManager";
+import AdminAccountsManager from "./cms/AdminAccountsManager";
+import TrackingSettingsManager from "./cms/TrackingSettingsManager";
 import {
   DatabaseState,
   GeneralSettings,
@@ -47,6 +56,8 @@ import {
   HelpCircle,
   ExternalLink,
   ShieldCheck,
+  ShieldAlert,
+  KeyRound,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -71,10 +82,13 @@ type CMSTab =
   | "popup"
   | "staff"
   | "professors"
-  | "helpdesk";
+  | "helpdesk"
+  | "faqs"
+  | "tracking"
+  | "admins";
 
 export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProps) {
-  const [user, setUser] = useState(auth.currentUser);
+  const [user, setUser] = useState<AdminUser | null>(getCurrentAdminUser());
   const [activeTab, setActiveTab] = useState<CMSTab>("general");
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
@@ -82,9 +96,10 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const [saveMode, setSaveMode] = useState<"draft" | "live" | null>(null);
   const [toastMessage, setToastMessage] = useState("");
 
-  // Email and Password Login States
+  // Admin Login States (Master: dmcadmin / Admin)
+  const [username, setUsername] = useState("dmcadmin");
+  const [password, setPassword] = useState("Admin");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -135,7 +150,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const [profSubjectsInput, setProfSubjectsInput] = useState("");
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currUser) => {
+    const unsubscribe = onAdminAuthStateChanged((currUser) => {
       setUser(currUser);
       if (currUser) {
         setAuthError("");
@@ -155,12 +170,14 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   };
 
   const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
     setAuthError("");
     setAuthSuccess("");
     setLoginLoading(true);
     try {
-      await signInWithPopup(auth, provider);
+      const loggedUser = await signInAdminWithGoogle();
+      setUser(loggedUser);
+      setAuthError("");
+      showToast("Successfully signed in to FSU CMS Control Center!");
     } catch (err: any) {
       setAuthError(err.message || "Failed to authenticate with Google.");
     } finally {
@@ -169,7 +186,37 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   };
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    await signOutAdmin();
+    setUser(null);
+    setAuthError("");
+  };
+
+  const handleCredentialsLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !password) {
+      setAuthError("Please provide both administrator username and password.");
+      return;
+    }
+
+    setLoginLoading(true);
+    setAuthError("");
+    setAuthSuccess("");
+
+    try {
+      const res = await loginAdminWithCredentials(username.trim(), password);
+      if (res.success && res.user) {
+        setUser(res.user);
+        setAuthError("");
+        showToast(`Welcome back, ${res.user.fullName || res.user.username}!`);
+      } else {
+        setAuthError(res.error || "Authentication failed. Invalid username or password.");
+      }
+    } catch (err: any) {
+      console.error("Auth Error:", err);
+      setAuthError(err.message || "Failed to authenticate.");
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
   const handleEmailPasswordLogin = async (e: React.FormEvent) => {
@@ -185,10 +232,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     setAuthSuccess("");
 
     try {
-      await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      const loggedUser = await signInAdminWithEmail(trimmedEmail, password);
+      setUser(loggedUser);
+      setAuthError("");
       showToast("Successfully signed in to FSU CMS Control Center!");
     } catch (err: any) {
-      console.error("Firebase Auth Error:", err);
+      console.error("Auth Error:", err);
       let errMsg = "Failed to authenticate. Please check your credentials.";
       if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
         errMsg = "Admin user not found or invalid credentials. If you need access, contact the FSU system administrator.";
@@ -196,7 +245,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
         errMsg = "Incorrect password. Click 'Forgot Password?' to reset it.";
       } else if (err.code === "auth/too-many-requests") {
         errMsg = "Access temporarily blocked due to repeated failed attempts. Please try again later or reset your password.";
-      } else if (err.message) {
+      } else if (err.message && !err.message.includes("api-key-not-valid")) {
         errMsg = err.message;
       }
       setAuthError(errMsg);
@@ -218,8 +267,8 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     setAuthSuccess("");
 
     try {
-      await sendPasswordResetEmail(auth, targetEmail);
-      setAuthSuccess(`Password reset email dispatched to ${targetEmail}. Please check your inbox or spam folder.`);
+      const successMsg = await resetPasswordAdmin(targetEmail);
+      setAuthSuccess(successMsg);
       setShowForgotPassword(false);
     } catch (err: any) {
       console.error("Password reset error:", err);
@@ -275,12 +324,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
       return;
     }
 
-    // Global Live via Firebase
+    // Global Live via dataService (local persistence + RTDB sync)
     try {
-      await set(ref(rtdb, "generalSettings"), genSettingsForm);
-      showToast("General settings published Globally Live to Firebase!");
-    } catch (err) {
-      alert("Failed to publish live settings: " + err);
+      const res = await saveNode("generalSettings", genSettingsForm);
+      showToast(res.message || "General settings saved successfully!");
+    } catch (err: any) {
+      alert("Failed to save settings: " + (err?.message || err));
     } finally {
       setSaving(false);
       setSaveMode(null);
@@ -304,12 +353,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
       return;
     }
 
-    // Global Live via Firebase
+    // Global Live via dataService
     try {
-      await set(ref(rtdb, "importantNotice"), importantNoticeForm);
-      showToast("Notice popup published Globally Live to Firebase!");
-    } catch (err) {
-      alert("Failed to publish live notice: " + err);
+      const res = await saveNode("importantNotice", importantNoticeForm);
+      showToast(res.message || "Notice popup saved successfully!");
+    } catch (err: any) {
+      alert("Failed to save notice: " + (err?.message || err));
     } finally {
       setSaving(false);
       setSaveMode(null);
@@ -320,65 +369,59 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const addSlide = async () => {
     if (!newSlide.imageUrl) return alert("Please specify or upload an image for the slide.");
     try {
-      const slidesRef = ref(rtdb, "slides");
-      const newItemRef = push(slidesRef);
-      await set(newItemRef, { id: newItemRef.key, ...newSlide });
+      const id = `slide_${Date.now()}`;
+      await saveSubItem("slides", id, { id, ...newSlide });
       setNewSlide({ titleEn: "", imageUrl: "" });
-      showToast("Hero carousel slide published globally live!");
-    } catch (err) { alert(err); }
+      showToast("Hero carousel slide published live!");
+    } catch (err: any) { alert(err?.message || err); }
   };
 
   const addNews = async () => {
     if (!newNews.headingEn || !newNews.bodyEn) return alert("Please specify news title and body text.");
     try {
-      const newsRef = ref(rtdb, "news");
-      const newItemRef = push(newsRef);
-      await set(newItemRef, { id: newItemRef.key, ...newNews, createdAt: Date.now() });
+      const id = `news_${Date.now()}`;
+      await saveSubItem("news", id, { id, ...newNews, createdAt: Date.now() });
       setNewNews({ headingEn: "", bodyEn: "", imageUrl: "" });
-      showToast("Announcement published globally live!");
-    } catch (err) { alert(err); }
+      showToast("Announcement published live!");
+    } catch (err: any) { alert(err?.message || err); }
   };
 
   const addMember = async () => {
     if (!newMember.nameEn || !newMember.roleEn) return alert("Please specify representative name and role.");
     if (team.length >= 30) return alert("FSU Committee displays a maximum of 30 cards. Please delete an existing card first.");
     try {
-      const teamRef = ref(rtdb, "team");
-      const newItemRef = push(teamRef);
-      await set(newItemRef, { id: newItemRef.key, ...newMember, order: Number(newMember.order) });
+      const id = `member_${Date.now()}`;
+      await saveSubItem("team", id, { id, ...newMember, order: Number(newMember.order) });
       setNewMember({ nameEn: "", roleEn: "", imageUrl: "", order: 6 });
-      showToast("FSU Team member card published globally live!");
-    } catch (err) { alert(err); }
+      showToast("FSU Team member card published live!");
+    } catch (err: any) { alert(err?.message || err); }
   };
 
   const addDownload = async () => {
     if (!newDownload.titleEn || !newDownload.fileUrl) return alert("Please specify document title and resource link.");
     try {
-      const dlRef = ref(rtdb, "downloads");
-      const newItemRef = push(dlRef);
-      await set(newItemRef, { id: newItemRef.key, ...newDownload });
+      const id = `dl_${Date.now()}`;
+      await saveSubItem("downloads", id, { id, ...newDownload });
       setNewDownload({ titleEn: "", fileUrl: "", isDriveLink: true });
-      showToast("Syllabus resource published globally live!");
-    } catch (err) { alert(err); }
+      showToast("Syllabus resource published live!");
+    } catch (err: any) { alert(err?.message || err); }
   };
 
   const addBlog = async () => {
     if (!newBlog.headingEn || !newBlog.bodyEn) return alert("Please specify article heading and content.");
     try {
-      const blogRef = ref(rtdb, "blogs");
-      const newItemRef = push(blogRef);
-      await set(newItemRef, { id: newItemRef.key, ...newBlog, createdAt: Date.now() });
+      const id = `blog_${Date.now()}`;
+      await saveSubItem("blogs", id, { id, ...newBlog, createdAt: Date.now() });
       setNewBlog({ headingEn: "", bodyEn: "", imageUrl: "", authorEn: "" });
-      showToast("Student blog article published globally live!");
-    } catch (err) { alert(err); }
+      showToast("Student blog article published live!");
+    } catch (err: any) { alert(err?.message || err); }
   };
 
   const addStaff = async () => {
     if (!newStaff.name || !newStaff.designation) return alert("Please specify staff name and designation.");
     try {
-      const staffRef = ref(rtdb, "staff");
-      const newItemRef = push(staffRef);
-      await set(newItemRef, { id: newItemRef.key, ...newStaff });
+      const id = `staff_${Date.now()}`;
+      await saveSubItem("staff", id, { id, ...newStaff });
       setNewStaff({
         name: "",
         designation: "",
@@ -389,20 +432,19 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
         workingHours: "Sunday – Friday: 10:00 AM – 5:00 PM",
         imageUrl: ""
       });
-      showToast("Campus staff member published globally live!");
-    } catch (err) { alert(err); }
+      showToast("Campus staff member saved!");
+    } catch (err: any) { alert(err?.message || err); }
   };
 
   const addProfessor = async () => {
     if (!newProf.name || !newProf.title) return alert("Please specify professor name and academic title.");
     try {
-      const profRef = ref(rtdb, "professors");
-      const newItemRef = push(profRef);
+      const id = `prof_${Date.now()}`;
       const subjectsArray = profSubjectsInput
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      await set(newItemRef, { id: newItemRef.key, ...newProf, subjects: subjectsArray });
+      await saveSubItem("professors", id, { id, ...newProf, subjects: subjectsArray });
       setNewProf({
         name: "",
         title: "",
@@ -416,17 +458,17 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
         imageUrl: ""
       });
       setProfSubjectsInput("");
-      showToast("Professor published globally live!");
-    } catch (err) { alert(err); }
+      showToast("Professor published live!");
+    } catch (err: any) { alert(err?.message || err); }
   };
 
   // Deleting items
   const deleteItem = async (node: string, id: string) => {
-    if (!window.confirm("Permanently delete this item from the live database?")) return;
+    if (!window.confirm("Permanently delete this item?")) return;
     try {
-      await remove(ref(rtdb, `${node}/${id}`));
-      showToast("Item removed from database.");
-    } catch (err) { alert(err); }
+      await deleteSubItem(node as keyof DatabaseState, id);
+      showToast("Item removed.");
+    } catch (err: any) { alert(err?.message || err); }
   };
 
   // Master Save All Functionality
@@ -449,11 +491,11 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     }
 
     try {
-      await set(ref(rtdb, "generalSettings"), genSettingsForm);
-      await set(ref(rtdb, "importantNotice"), importantNoticeForm);
-      showToast("All settings & notices published Globally Live to Firebase!");
-    } catch (err) {
-      alert("Failed to publish live: " + err);
+      await saveNode("generalSettings", genSettingsForm);
+      await saveNode("importantNotice", importantNoticeForm);
+      showToast("All settings & notices saved successfully!");
+    } catch (err: any) {
+      alert("Failed to save: " + (err?.message || err));
     } finally {
       setSaving(false);
       setSaveMode(null);
@@ -461,7 +503,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   };
 
   // Login Screen Gate
-  if (!user || authError) {
+  if (!user) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4 bg-slate-50">
         <div className="bg-white p-8 rounded-3xl max-w-md w-full shadow-xl border border-slate-200 flex flex-col items-center">
@@ -494,128 +536,77 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             </div>
           )}
 
-          {!showForgotPassword ? (
-            /* Email and Password Form */
-            <form onSubmit={handleEmailPasswordLogin} className="w-full space-y-4">
+          {/* Master / Secondary Admin Login Form */}
+          <form onSubmit={handleCredentialsLogin} className="w-full space-y-4">
+            <div className="p-3 bg-amber-50/80 border border-amber-200/90 rounded-2xl text-[11px] text-amber-950 flex items-start gap-2.5">
+              <KeyRound className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Authorized Admin Email
+                <span className="font-bold block">Master Admin Credentials:</span>
+                <span>Username: <strong className="font-mono text-blue-950">dmcadmin</strong> &bull; Password: <strong className="font-mono text-blue-950">Admin</strong></span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                Admin Username
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                  <Users className="w-4 h-4" />
+                </span>
+                <input
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="dmcadmin"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Password
                 </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                    <Mail className="w-4 h-4" />
-                  </span>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="fsudmcdcl@gmail.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
-                  />
-                </div>
+                <span className="text-[10px] text-slate-400 font-mono">Case-sensitive</span>
               </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Admin Password
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setResetEmail(email);
-                      setShowForgotPassword(true);
-                      setAuthError("");
-                      setAuthSuccess("");
-                    }}
-                    className="text-xs text-blue-900 hover:text-blue-950 font-bold hover:underline"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                    <Lock className="w-4 h-4" />
-                  </span>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loginLoading}
-                className="w-full py-3 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {loginLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                )}
-                <span>Log In to CMS Panel</span>
-              </button>
-            </form>
-          ) : (
-            /* Forgot Password Form */
-            <form onSubmit={handleForgotPassword} className="w-full space-y-4 text-left">
-              <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-xs text-blue-950 leading-relaxed">
-                Enter your registered admin email address below to receive an encrypted Firebase Authentication password reset email.
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Admin Email
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                    <Mail className="w-4 h-4" />
-                  </span>
-                  <input
-                    type="email"
-                    required
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    placeholder="name@fsudmc.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={resetLoading}
-                  className="flex-1 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {resetLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-                  <span>Send Reset Email</span>
-                </button>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
+                />
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowForgotPassword(false);
-                    setAuthError("");
-                  }}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
-                  Cancel
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </form>
-          )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full py-3 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {loginLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              )}
+              <span>Log In to CMS Panel</span>
+            </button>
+          </form>
 
           {/* Separator */}
           <div className="w-full flex items-center my-5">
@@ -675,9 +666,18 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           <h2 className="text-2xl md:text-3xl font-serif font-black">
             FSU CMS Control Center
           </h2>
-          <p className="text-xs text-blue-200/80 font-mono mt-1">
-            Admin: <span className="text-emerald-300 font-bold">{user.email}</span> &bull; URL: <span className="text-amber-300 font-semibold">https://www.fsudmc.com/#campuslogin</span>
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <span className="text-xs text-blue-200/90 font-mono">
+              Admin: <strong className="text-emerald-300 font-bold">{user.fullName || user.username || user.email}</strong>
+            </span>
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider font-mono ${
+              user.role === "master"
+                ? "bg-amber-400 text-slate-950 font-bold"
+                : "bg-blue-300 text-blue-950 font-bold"
+            }`}>
+              {user.role === "master" ? "Master Admin" : "Secondary Admin"}
+            </span>
+          </div>
         </div>
 
         {/* Master Control Buttons: Save Data & Global Live */}
@@ -827,6 +827,26 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           </button>
 
           <button
+            onClick={() => setActiveTab("faqs")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "faqs" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <HelpCircle className="w-4 h-4 text-blue-600" />
+            <span>FAQs (Accordion) Manager</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("tracking")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "tracking" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Complaint Tracker Setup</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab("helpdesk")}
             className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
               activeTab === "helpdesk" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
@@ -835,6 +855,28 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             <HelpCircle className="w-4 h-4 text-emerald-600" />
             <span>Helpdesk & Hotline Settings</span>
           </button>
+
+          <div className="pt-2 mt-2 border-t border-slate-100">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-3 mb-1 block">
+              ACCESS CONTROL
+            </span>
+            <button
+              onClick={() => setActiveTab("admins")}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between ${
+                activeTab === "admins" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <KeyRound className="w-4 h-4 text-amber-500" />
+                <span>Admin Accounts & Roles</span>
+              </div>
+              {user.role === "master" && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-bold text-[9px] uppercase font-mono">
+                  Master
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Tab Content Display */}
@@ -1996,6 +2038,21 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                 </div>
               </div>
             </div>
+          )}
+
+          {/* TAB 11: FAQS ACCORDION CRUD MANAGER */}
+          {activeTab === "faqs" && (
+            <FaqManager faqs={state?.faqs} onShowToast={showToast} />
+          )}
+
+          {/* TAB 12: COMPLAINT TRACKER SETTINGS */}
+          {activeTab === "tracking" && (
+            <TrackingSettingsManager settings={state?.trackingSettings} onShowToast={showToast} />
+          )}
+
+          {/* TAB 13: ADMIN ACCOUNTS & ROLE PERMISSIONS */}
+          {activeTab === "admins" && (
+            <AdminAccountsManager currentUser={user} onShowToast={showToast} />
           )}
 
         </div>

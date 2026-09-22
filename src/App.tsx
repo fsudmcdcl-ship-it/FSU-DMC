@@ -14,6 +14,12 @@ import {
   ProfessorItem,
 } from "./types";
 import { DEFAULT_DB_STATE } from "./lib/defaults";
+import {
+  loadInitialDbState,
+  getLocalNodeData,
+  setLocalNodeData,
+  onLocalDataChanged,
+} from "./lib/dataService";
 
 // Core Components
 import Header from "./components/Header";
@@ -27,6 +33,8 @@ import TeamSection from "./components/TeamSection";
 import DownloadsSection from "./components/DownloadsSection";
 import BlogsSection from "./components/BlogsSection";
 import ContactSection from "./components/ContactSection";
+import FaqSection from "./components/FaqSection";
+import ComplaintTracker from "./components/ComplaintTracker";
 import PopupNotice from "./components/PopupNotice";
 import CMSPanel from "./components/CMSPanel";
 import MessagesViewer from "./components/MessagesViewer";
@@ -45,7 +53,7 @@ import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsPage from "./pages/TermsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
-import { ArrowDown, Facebook, GraduationCap, ShieldCheck, ExternalLink } from "lucide-react";
+import { ArrowDown, Facebook, GraduationCap, ShieldCheck, ExternalLink, Search } from "lucide-react";
 
 export type RouteType =
   | "home"
@@ -62,11 +70,12 @@ export type RouteType =
   | "professors"
   | "fsu-helpdesk"
   | "contact-secretariat"
+  | "my-complaint"
   | "not-found";
 
 export default function App() {
   const [loading, setLoading] = useState(true);
-  const [dbState, setDbState] = useState<DatabaseState>(DEFAULT_DB_STATE);
+  const [dbState, setDbState] = useState<DatabaseState>(loadInitialDbState);
 
   // Active Route
   const [currentRoute, setCurrentRoute] = useState<RouteType>("home");
@@ -76,6 +85,7 @@ export default function App() {
   const [forceNoticeTrigger, setForceNoticeTrigger] = useState(0);
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
   const [selectedBlogId, setSelectedBlogId] = useState<string | null>(null);
+  const [showTrackerModal, setShowTrackerModal] = useState(false);
 
   // Router parsing logic
   const parsePathToRoute = (): { route: RouteType; slug?: string } => {
@@ -102,6 +112,7 @@ export default function App() {
       if (pageParam === "professors") return { route: "professors" };
       if (pageParam === "fsu-helpdesk") return { route: "fsu-helpdesk" };
       if (pageParam === "contact-secretariat") return { route: "contact-secretariat" };
+      if (pageParam === "my-complaint" || pageParam === "track") return { route: "my-complaint" };
       return { route: "not-found", slug: `?page=${params.get("page")}` };
     }
 
@@ -122,6 +133,8 @@ export default function App() {
       if (hash === "#professors" || hash === "#/professors") return { route: "professors" };
       if (hash === "#fsu-helpdesk" || hash === "#/fsu-helpdesk") return { route: "fsu-helpdesk" };
       if (hash === "#contact-secretariat" || hash === "#/contact-secretariat") return { route: "contact-secretariat" };
+      if (hash === "#my-complaint" || hash === "#/my-complaint" || hash === "#track" || hash === "#/track")
+        return { route: "my-complaint" };
       return { route: "not-found", slug: rawHash };
     }
 
@@ -148,6 +161,7 @@ export default function App() {
     if (path.endsWith("/professors")) return { route: "professors" };
     if (path.endsWith("/fsu-helpdesk")) return { route: "fsu-helpdesk" };
     if (path.endsWith("/contact-secretariat")) return { route: "contact-secretariat" };
+    if (path.endsWith("/my-complaint") || path.endsWith("/track")) return { route: "my-complaint" };
 
     // Any other pathname is unrecognized
     return { route: "not-found", slug: rawPath };
@@ -191,6 +205,9 @@ export default function App() {
     } else if (route === "databasemessage2083") {
       newUrl.hash = "#messages";
       newUrl.pathname = "/";
+    } else if (route === "my-complaint") {
+      newUrl.pathname = "/my-complaint";
+      newUrl.hash = "#my-complaint";
     } else if (route === "not-found") {
       newUrl.pathname = "/404";
     } else {
@@ -214,6 +231,14 @@ export default function App() {
     };
     checkAndSeed();
 
+    // Listen for local CMS data modifications for instant reactive updates
+    const unsubLocal = onLocalDataChanged(({ key, data }) => {
+      setDbState((prev) => ({
+        ...prev,
+        [key]: data,
+      }));
+    });
+
     const publicKeys: (keyof DatabaseState)[] = [
       "generalSettings",
       "importantNotice",
@@ -224,6 +249,8 @@ export default function App() {
       "team",
       "staff",
       "professors",
+      "faqs",
+      "trackingSettings",
     ];
 
     let loadedCount = 0;
@@ -233,10 +260,13 @@ export default function App() {
         nodeRef,
         (snapshot) => {
           const val = snapshot.val();
-          setDbState((prev) => ({
-            ...prev,
-            [key]: val || DEFAULT_DB_STATE[key],
-          }));
+          if (val !== null && val !== undefined) {
+            setLocalNodeData(key, val);
+            setDbState((prev) => ({
+              ...prev,
+              [key]: val,
+            }));
+          }
 
           loadedCount++;
           if (loadedCount >= publicKeys.length) {
@@ -244,7 +274,13 @@ export default function App() {
           }
         },
         (err) => {
-          console.error(`Failed to read node ${key}: `, err);
+          // Graceful fallback for permission restricted or offline nodes
+          console.warn(`[RTDB Sync] Node "${key}" fallback to local persistence.`);
+          setDbState((prev) => ({
+            ...prev,
+            [key]: getLocalNodeData(key),
+          }));
+
           loadedCount++;
           if (loadedCount >= publicKeys.length) {
             setLoading(false);
@@ -253,7 +289,14 @@ export default function App() {
       );
     });
 
+    // Safety timeout to ensure loading screen resolves quickly
+    const fallbackTimer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+
     return () => {
+      clearTimeout(fallbackTimer);
+      unsubLocal();
       unsubscribes.forEach((unsub) => unsub());
     };
   }, []);
@@ -271,6 +314,47 @@ export default function App() {
 
   const president = team.find((m) => m.order === 1);
 
+  // INITIAL CUSTOM LOADING STATE (SPLASH SCREEN)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-slate-900 text-white flex flex-col items-center justify-center p-6 text-center select-none relative overflow-hidden">
+        {/* Cultural Nepali corner ornament & background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 max-w-lg space-y-6 flex flex-col items-center">
+          {/* Emblem Icon / Cultural Namaste Badge */}
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-red-600 to-amber-500 p-0.5 shadow-2xl shadow-red-900/40 animate-pulse">
+            <div className="w-full h-full bg-slate-950 rounded-[22px] flex items-center justify-center text-3xl">
+              🙏
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <span className="inline-block px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 font-mono text-[11px] font-bold tracking-widest uppercase">
+              Free Student Union &bull; Darchula Multiple Campus
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-white leading-snug">
+              Namaste 🙏 Welcome to FSU DMC OFFICIAL SITE
+            </h1>
+            <p className="text-xs text-blue-200/80 font-medium max-w-md mx-auto leading-relaxed">
+              स्वतन्त्र विद्यार्थी युनियन, दार्चुला बहुमुखी क्याम्पस — आधिकारिक पोर्टल
+            </p>
+          </div>
+
+          {/* Elegant Loading Animation */}
+          <div className="w-48 h-1.5 bg-white/10 rounded-full overflow-hidden relative">
+            <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-400 via-red-500 to-amber-300 w-1/2 rounded-full animate-indeterminate" />
+          </div>
+
+          <p className="text-[11px] text-slate-400 font-mono">
+            Connecting Students &bull; Empowering Campus Voices
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // ROUTE 1: CMS PANEL
   if (currentRoute === "campuslogin") {
     return (
@@ -280,7 +364,7 @@ export default function App() {
           onGoHome={() => navigateTo("home")}
           onGoMessages={() => navigateTo("databasemessage2083")}
         />
-        <Footer settings={settings} onNavigate={(slug) => navigateTo(slug as RouteType)} />
+        <Footer settings={settings} onNavigate={(slug) => navigateTo(slug as RouteType)} onOpenTracker={() => setShowTrackerModal(true)} />
       </div>
     );
   }
@@ -290,7 +374,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col justify-between">
         <MessagesViewer onGoHome={() => navigateTo("home")} />
-        <Footer settings={settings} onNavigate={(slug) => navigateTo(slug as RouteType)} />
+        <Footer settings={settings} onNavigate={(slug) => navigateTo(slug as RouteType)} onOpenTracker={() => setShowTrackerModal(true)} />
       </div>
     );
   }
@@ -468,6 +552,14 @@ export default function App() {
               />
             </section>
 
+            {/* FAQS ACCORDION COMPONENT & CMS INTEGRATION */}
+            <section id="faqs" className="border-t border-slate-100 pt-16">
+              <FaqSection
+                faqs={dbState?.faqs}
+                onTrackClick={() => setShowTrackerModal(true)}
+              />
+            </section>
+
             {/* CONTACT SECTION */}
             <section id="contact" className="border-t border-slate-100 pt-16">
               <ContactSection />
@@ -489,8 +581,17 @@ export default function App() {
         {currentRoute === "contact" && <ContactPage />}
         {currentRoute === "campus-staff" && <CampusStaffPage staff={staff} />}
         {currentRoute === "professors" && <ProfessorsPage professors={professors} />}
-        {currentRoute === "fsu-helpdesk" && <HelpdeskPage />}
+        {currentRoute === "fsu-helpdesk" && <HelpdeskPage faqs={dbState?.faqs} />}
         {currentRoute === "contact-secretariat" && <SecretariatPage />}
+        {currentRoute === "my-complaint" && (
+          <div className="w-full py-8 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+            <ComplaintTracker
+              isStandalonePage={true}
+              state={dbState}
+              onNavigateHome={() => navigateTo("home")}
+            />
+          </div>
+        )}
         {currentRoute === "privacy-policy" && (
           <PrivacyPolicyPage
             settings={settings}
@@ -512,7 +613,24 @@ export default function App() {
       </main>
 
       {/* Main Footer layout */}
-      <Footer settings={settings} onNavigate={(slug) => navigateTo(slug as RouteType)} />
+      <Footer
+        settings={settings}
+        onNavigate={(slug) => navigateTo(slug as RouteType)}
+        onOpenTracker={() => setShowTrackerModal(true)}
+      />
+
+      {/* Global Track Complaint Modal Popup */}
+      {showTrackerModal && (
+        <ComplaintTracker
+          isOpen={showTrackerModal}
+          onClose={() => setShowTrackerModal(false)}
+          state={dbState}
+          onNavigateHome={() => {
+            setShowTrackerModal(false);
+            navigateTo("home");
+          }}
+        />
+      )}
     </div>
   );
 }

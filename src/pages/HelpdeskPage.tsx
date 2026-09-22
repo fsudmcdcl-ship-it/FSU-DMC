@@ -55,7 +55,11 @@ const FAQS: FAQ[] = [
   },
 ];
 
-export default function HelpdeskPage() {
+interface HelpdeskPageProps {
+  faqs?: Record<string, any>;
+}
+
+export default function HelpdeskPage({ faqs }: HelpdeskPageProps) {
   const [name, setName] = useState("");
   const [rollNumber, setRollNumber] = useState("");
   const [faculty, setFaculty] = useState("Faculty of Management (BBS)");

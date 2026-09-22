@@ -1,17 +1,27 @@
 import React from "react";
 import { GeneralSettings } from "../types";
-import { Shield, BookOpen, ExternalLink, HelpCircle, Users, GraduationCap, Building2, Mail, MapPin } from "lucide-react";
+import { Shield, BookOpen, ExternalLink, HelpCircle, Users, GraduationCap, Building2, Mail, MapPin, Search } from "lucide-react";
 
 interface FooterProps {
   settings?: GeneralSettings;
   onNavigate?: (slug: string) => void;
+  onOpenTracker?: () => void;
 }
 
-export default function Footer({ onNavigate }: FooterProps) {
+export default function Footer({ onNavigate, onOpenTracker }: FooterProps) {
   const handleNav = (slug: string, e: React.MouseEvent) => {
     if (onNavigate) {
       e.preventDefault();
       onNavigate(slug);
+    }
+  };
+
+  const handleTrackClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (onOpenTracker) {
+      onOpenTracker();
+    } else if (onNavigate) {
+      onNavigate("my-complaint");
     }
   };
 
@@ -133,9 +143,17 @@ export default function Footer({ onNavigate }: FooterProps) {
         {/* Column 4: Policy & Legal Pages */}
         <div>
           <h3 className="text-base font-bold font-serif text-white mb-4 border-b border-gray-800 pb-2">
-            Terms & Governance
+            Grievance & Governance
           </h3>
           <div className="flex flex-col gap-2.5 text-xs">
+            <a
+              href="/my-complaint"
+              onClick={handleTrackClick}
+              className="px-3 py-2 bg-gradient-to-r from-red-950 to-blue-950 border border-amber-400/40 text-amber-300 hover:text-white rounded-xl transition flex items-center gap-2 cursor-pointer shadow-sm group"
+            >
+              <Search className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+              <span className="font-bold">Track Your Complaint</span>
+            </a>
             <a
               href="/privacy-policy"
               onClick={(e) => handleNav("privacy-policy", e)}
@@ -167,21 +185,27 @@ export default function Footer({ onNavigate }: FooterProps) {
       {/* Divider */}
       <div className="border-t border-slate-900 my-6 max-w-7xl mx-auto px-4" />
 
-      {/* Attribution Line */}
-      <div className="text-center px-4 flex flex-col items-center justify-center gap-2">
+      {/* Bottom bar with Track Your Complaint replacement */}
+      <div className="text-center px-4 flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-4">
         <p className="text-xs text-gray-500 font-mono tracking-wider">
-          &copy; {new Date().getFullYear()} Free Student Union - DMC | Darchula Multiple Campus. All rights reserved.
+          &copy; {new Date().getFullYear()} Free Student Union - DMC | Darchula Multiple Campus.
         </p>
-        <p className="text-xs text-gray-400 font-sans tracking-wide">
-          Built with Love, Dedicated to FSUDMC —{" "}
+        
+        {/* Track Your Complaint Primary CTA */}
+        <div className="flex items-center gap-3">
           <a
-            id="amit-signature"
-            href="https://www.fsudmc.com/#contact"
-            className="text-amber-400 hover:text-amber-300 underline decoration-amber-400/80 transition-colors"
-            title="Profile of Amit - FSU President"
+            id="track-complaint-footer-link"
+            href="/my-complaint"
+            onClick={handleTrackClick}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-900/60 hover:bg-blue-800 border border-blue-700/60 text-amber-300 hover:text-amber-200 text-xs font-bold transition-all shadow-sm cursor-pointer"
           >
-            <b>BY AMIT</b>
+            <Search className="w-3.5 h-3.5 text-amber-400" />
+            <span>Track Your Complaint (स्थिति जाँच्नुहोस्)</span>
           </a>
+        </div>
+
+        <p className="text-xs text-gray-400 font-sans tracking-wide">
+          Official FSU Portal &bull; Affiliated to Farwestern University
         </p>
       </div>
     </footer>

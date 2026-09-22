@@ -1,19 +1,22 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, get, set, child } from "firebase/database";
 import { getAuth } from "firebase/auth";
+import { getAnalytics, isSupported } from "firebase/analytics";
 import { DatabaseState } from "../types";
 
-// Firebase configuration using environment variables or safe public configuration for DMC
+// Firebase configuration using user provided project configuration with environment variable override support
 const env = (import.meta as any).env || {};
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyCSbIo5RUS0OZ_-sGuSjFHOy5P7knYWPeY",
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "fsu-bdbf6.firebaseapp.com",
-databaseURL: env.VITE_FIREBASE_DATABASE_URL || "https://fsu-bdbf6-default-rtdb.asia-southeast1.firebasedatabase.app",
+  databaseURL: env.VITE_FIREBASE_DATABASE_URL || "https://fsu-bdbf6-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: env.VITE_FIREBASE_PROJECT_ID || "fsu-bdbf6",
-  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "fsu-bdbf6.appspot.com",
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "fsu-bdbf6.firebasestorage.app",
   messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "214528113668",
-  appId: env.VITE_FIREBASE_APP_ID || "1:214528113668:web:abcdef1234567890",
+  appId: env.VITE_FIREBASE_APP_ID || "1:214528113668:web:dfc4abf7d3736c8d454951",
+  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID || "G-F49VKLZ071",
 };
+
 // Initialize Firebase App
 export const firebaseApp = initializeApp(firebaseConfig);
 
@@ -22,6 +25,20 @@ export const rtdb = getDatabase(firebaseApp);
 
 // Initialize Firebase Authentication
 export const auth = getAuth(firebaseApp);
+
+// Initialize Firebase Analytics if supported
+export let analytics: ReturnType<typeof getAnalytics> | null = null;
+if (typeof window !== "undefined") {
+  isSupported()
+    .then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(firebaseApp);
+      }
+    })
+    .catch(() => {
+      // Analytics optional in restricted environments
+    });
+}
 
 /**
  * Seed initial database content on first startup if the database is unpopulated.
@@ -49,13 +66,13 @@ export async function seedInitialDataIfEmpty() {
         aboutCampusEn: "Darchula Multiple Campus (DMC), established in 2062 BS, is a premier higher education institution in the far-western mountain district of Darchula, Nepal. Affiliated with Farwestern University, DMC provides accessible, quality education in Humanities, Management, and Education streams to students from remote communities. It is committed to fostering academic competence, moral values, and social responsibility under the leadership of dedicated faculties and campus management.",
         aboutCampusNp: "Darchula Multiple Campus (DMC) is a premier higher education institution in the far-western mountain district of Darchula, Nepal, affiliated with Farwestern University.",
         aboutCampusImg: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&q=80&w=800",
-        presidentNameEn: "Mr. Prakash Badu",
-        presidentNameNp: "Mr. Prakash Badu",
+        presidentNameEn: "Mr. Amit Joshi",
+        presidentNameNp: "Mr. Amit Joshi",
         presidentPhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
         presidentMessageEn: "Dear fellow students, it is an absolute honor to lead the Free Student Union at Darchula Multiple Campus. Our FSU is committed to creating an inclusive, vibrant, and progressive academic environment. We are focused on strengthening student facilities, organizing national seminars, modernizing our library, and expanding sports initiatives. Let us work hand in hand to make our campus a hub of excellence and standard education.",
         presidentMessageNp: "Dear fellow students, our FSU is committed to creating an inclusive, vibrant, and progressive academic environment for every student at Darchula Multiple Campus.",
-        chiefNameEn: "Associate Prof. Narendra Raj Awasthi",
-        chiefNameNp: "Associate Prof. Narendra Raj Awasthi",
+        chiefNameEn: "Associate Prof. Dr. Dinesh Kumar Bhatt",
+        chiefNameNp: "Associate Prof. Dr. Dinesh Kumar Bhatt",
         chiefPhoto: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200",
         chiefMessageEn: "Welcome to Darchula Multiple Campus. As the Campus Chief, I am proud of our academic legacy and the synergy we share with our vibrant student community and the FSU. We strive to provide standard higher education using modern teaching methodologies, and we continuously support our students in academic and extra-curricular paths to prepare them for global opportunities.",
         chiefMessageNp: "Welcome to Darchula Multiple Campus. We strive to provide standard higher education and prepare our students for competitive professional opportunities.",
@@ -170,8 +187,8 @@ export async function seedInitialDataIfEmpty() {
       team: {
         "member_1": {
           id: "member_1",
-          nameEn: "Prakash Badu",
-          nameNp: "Prakash Badu",
+          nameEn: "Amit Joshi",
+          nameNp: "Amit Joshi",
           roleEn: "FSU President",
           roleNp: "FSU President",
           imageUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200",
@@ -215,7 +232,7 @@ export async function seedInitialDataIfEmpty() {
         }
       },
       importantNotice: {
-        active: false,
+        active: true,
         titleEn: "FSU Special Campus Admission Support Notice 2083",
         titleNp: "FSU Special Campus Admission Support Notice 2083",
         bodyEn: "The Free Student Union has set up a specialized 'Admission Help Desk' inside the campus premises to assist new students enrolling in B.Ed, BBS, and BA first year. We provide guidance on choosing subjects, completing application forms, and understanding scholarship criteria. Contact the FSU Secretariat for immediate assistance.",
@@ -228,6 +245,6 @@ export async function seedInitialDataIfEmpty() {
     await set(ref(rtdb), initialData);
     console.log("Database seeded successfully with Darchula Multiple Campus English defaults!");
   } catch (err) {
-    console.error("Failed to seed initial database state: ", err);
+    console.warn("Database seeding notice: ", err);
   }
 }

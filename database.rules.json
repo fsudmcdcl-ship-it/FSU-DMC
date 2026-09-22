@@ -1,38 +1,58 @@
 {
   "rules": {
+    ".read": true,
+    ".write": true,
     "generalSettings": {
-      ".read": "true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "importantNotice": {
-      ".read": "true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "slides": {
-      ".read": "true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "news": {
-      ".read": "true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "downloads": {
-      ".read": "true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "blogs": {
-      ".read": "true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
     },
     "team": {
-      ".read": "true",
-      ".write": "auth != null"
+      ".read": true,
+      ".write": true
+    },
+    "staff": {
+      ".read": true,
+      ".write": true
+    },
+    "professors": {
+      ".read": true,
+      ".write": true
+    },
+    "faqs": {
+      ".read": true,
+      ".write": true
+    },
+    "trackingSettings": {
+      ".read": true,
+      ".write": true
+    },
+    "admins": {
+      ".read": true,
+      ".write": true
     },
     "contacts": {
-      ".read": "auth != null",
-      "$contact_id": {
-        ".write": "auth != null || (!data.exists() && newData.exists())"
-      }
+      ".read": true,
+      ".write": true
     }
   }
 }
