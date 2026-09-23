@@ -72,6 +72,8 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
   const [savedSuccessId, setSavedSuccessId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [deleteTargetItem, setDeleteTargetItem] = useState<ContactSubmission | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Monitor auth state changes
   useEffect(() => {
@@ -145,13 +147,22 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
     setUser(null);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to permanently delete this message record?")) return;
+  const requestDeleteMessage = (item: ContactSubmission) => {
+    setDeleteTargetItem(item);
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!deleteTargetItem) return;
+    const id = deleteTargetItem.id;
+    setDeletingId(id);
     try {
       await remove(ref(rtdb, `contacts/${id}`));
       setMessages((prev) => prev.filter((m) => m.id !== id));
-    } catch (err) {
-      alert("Failed to delete record. Please check database permissions.");
+      setDeleteTargetItem(null);
+    } catch (err: any) {
+      alert("Failed to delete record: " + (err?.message || "Please check database permissions."));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -500,7 +511,7 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
                     {user.role !== "reviewer" && (
                       <button
                         type="button"
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => requestDeleteMessage(item)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
                         title="Delete record"
                       >
@@ -735,6 +746,76 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
               alt="Enlarged attachment"
               className="max-h-[80vh] w-auto object-contain rounded-xl"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTargetItem && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => !deletingId && setDeleteTargetItem(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 shrink-0">
+                    <Trash2 className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-serif font-bold text-lg text-slate-900 leading-snug">
+                      Delete Message Record?
+                    </h4>
+                    <span className="text-[11px] font-mono text-red-600 font-semibold uppercase tracking-wider">
+                      Permanent Deletion
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !deletingId && setDeleteTargetItem(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                  disabled={!!deletingId}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 space-y-2">
+                <p className="font-medium text-slate-900">
+                  Are you sure you want to permanently delete this student submission?
+                </p>
+                <div className="text-slate-600 space-y-0.5 border-t border-slate-200 pt-2 font-mono text-[11px]">
+                  <div><strong>Student:</strong> {deleteTargetItem.name}</div>
+                  {deleteTargetItem.subject && <div><strong>Subject:</strong> {deleteTargetItem.subject}</div>}
+                  {deleteTargetItem.trackingPin && <div><strong>PIN:</strong> {deleteTargetItem.trackingPin}</div>}
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTargetItem(null)}
+                  disabled={!!deletingId}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteMessage}
+                  disabled={!!deletingId}
+                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md shadow-red-600/30 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{deletingId ? "Deleting..." : "Delete Permanently"}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

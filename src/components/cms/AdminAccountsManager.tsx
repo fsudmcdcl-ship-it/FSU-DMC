@@ -30,11 +30,18 @@ import {
 interface AdminAccountsManagerProps {
   currentUser: AdminUser;
   onShowToast: (msg: string) => void;
+  onRequestConfirmDelete?: (options: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    onConfirm: () => void | Promise<void>;
+  }) => void;
 }
 
 export default function AdminAccountsManager({
   currentUser,
   onShowToast,
+  onRequestConfirmDelete,
 }: AdminAccountsManagerProps) {
   const isMaster = currentUser.role === "master";
 
@@ -154,20 +161,25 @@ export default function AdminAccountsManager({
       return;
     }
 
-    if (
-      !window.confirm(
-        `Are you sure you want to remove administrator "${admin.username}" (${admin.fullName})? They will lose CMS access immediately.`
-      )
-    ) {
-      return;
-    }
+    const doDelete = async () => {
+      const res = await deleteSecondaryAdmin(admin.id);
+      if (res.success) {
+        onShowToast(`Administrator "${admin.username}" removed.`);
+        refreshAdmins();
+      } else {
+        alert(res.error || "Failed to delete administrator.");
+      }
+    };
 
-    const res = await deleteSecondaryAdmin(admin.id);
-    if (res.success) {
-      onShowToast(`Administrator "${admin.username}" removed.`);
-      refreshAdmins();
+    if (onRequestConfirmDelete) {
+      onRequestConfirmDelete({
+        title: "Remove Administrator?",
+        message: `Are you sure you want to remove administrator "${admin.username}" (${admin.fullName})? They will lose CMS access immediately.`,
+        confirmLabel: "Remove Admin",
+        onConfirm: doDelete,
+      });
     } else {
-      alert(res.error || "Failed to delete administrator.");
+      await doDelete();
     }
   };
 

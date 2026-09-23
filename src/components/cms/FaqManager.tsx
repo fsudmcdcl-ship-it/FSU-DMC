@@ -21,9 +21,15 @@ import {
 interface FaqManagerProps {
   faqs?: Record<string, FaqItem>;
   onShowToast: (msg: string) => void;
+  onRequestConfirmDelete?: (options: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    onConfirm: () => void | Promise<void>;
+  }) => void;
 }
 
-export default function FaqManager({ faqs, onShowToast }: FaqManagerProps) {
+export default function FaqManager({ faqs, onShowToast, onRequestConfirmDelete }: FaqManagerProps) {
   // Use state faqs or fallback to defaults
   const faqSource = faqs && Object.keys(faqs).length > 0 ? faqs : DEFAULT_DB_STATE.faqs || {};
   const faqList: FaqItem[] = Object.values(faqSource).sort(
@@ -96,13 +102,25 @@ export default function FaqManager({ faqs, onShowToast }: FaqManagerProps) {
     }
   };
 
-  const handleDeleteFaq = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this FAQ item?")) return;
-    try {
-      const result = await deleteSubItem("faqs", id);
-      onShowToast(result.message || "FAQ item removed from portal.");
-    } catch (err: any) {
-      alert("Failed to delete FAQ: " + err.message);
+  const handleDeleteFaq = async (id: string, qEn?: string) => {
+    const doDelete = async () => {
+      try {
+        const result = await deleteSubItem("faqs", id);
+        onShowToast(result.message || "FAQ item removed from portal.");
+      } catch (err: any) {
+        alert("Failed to delete FAQ: " + err.message);
+      }
+    };
+
+    if (onRequestConfirmDelete) {
+      onRequestConfirmDelete({
+        title: "Delete FAQ Question?",
+        message: `Are you sure you want to delete ${qEn ? `"${qEn}"` : "this FAQ item"}? It will be removed from the student helpdesk immediately.`,
+        confirmLabel: "Delete FAQ",
+        onConfirm: doDelete,
+      });
+    } else {
+      await doDelete();
     }
   };
 
@@ -289,7 +307,7 @@ export default function FaqManager({ faqs, onShowToast }: FaqManagerProps) {
 
                   <button
                     type="button"
-                    onClick={() => handleDeleteFaq(faq.id)}
+                    onClick={() => handleDeleteFaq(faq.id, faq.questionEn)}
                     title="Delete FAQ"
                     className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-700 cursor-pointer transition-colors"
                   >

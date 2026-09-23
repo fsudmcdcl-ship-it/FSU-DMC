@@ -3078,7 +3078,13 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             <CampusPortalManager
               state={state}
               onShowToast={showToast}
-              onRequestConfirmDelete={setConfirmModal}
+              onRequestConfirmDelete={(options) =>
+                setConfirmModal({
+                  isOpen: true,
+                  confirmStyle: "danger",
+                  ...options,
+                })
+              }
             />
           )}
 
@@ -3087,7 +3093,13 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             <UpcomingEventsManager
               state={state}
               onShowToast={showToast}
-              onRequestConfirmDelete={setConfirmModal}
+              onRequestConfirmDelete={(options) =>
+                setConfirmModal({
+                  isOpen: true,
+                  confirmStyle: "danger",
+                  ...options,
+                })
+              }
             />
           )}
 
@@ -3144,7 +3156,17 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
 
           {/* TAB 11: FAQS ACCORDION CRUD MANAGER */}
           {activeTab === "faqs" && (
-            <FaqManager faqs={state?.faqs} onShowToast={showToast} />
+            <FaqManager
+              faqs={state?.faqs}
+              onShowToast={showToast}
+              onRequestConfirmDelete={(options) =>
+                setConfirmModal({
+                  isOpen: true,
+                  confirmStyle: "danger",
+                  ...options,
+                })
+              }
+            />
           )}
 
           {/* TAB 12: COMPLAINT TRACKER SETTINGS */}
@@ -3154,11 +3176,93 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
 
           {/* TAB 13: ADMIN ACCOUNTS & ROLE PERMISSIONS */}
           {activeTab === "admins" && (
-            <AdminAccountsManager currentUser={user} onShowToast={showToast} />
+            <AdminAccountsManager
+              currentUser={user}
+              onShowToast={showToast}
+              onRequestConfirmDelete={(options) =>
+                setConfirmModal({
+                  isOpen: true,
+                  confirmStyle: "danger",
+                  ...options,
+                })
+              }
+            />
           )}
 
         </div>
       </div>
+
+      {/* GLOBAL REUSABLE CONFIRMATION MODAL */}
+      {confirmModal.isOpen && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden transform animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 shrink-0 shadow-xs">
+                    <Trash2 className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-serif font-bold text-lg text-slate-900 leading-snug">
+                      {confirmModal.title || "Confirm Deletion"}
+                    </h4>
+                    <span className="text-[11px] font-mono text-red-600 font-semibold uppercase tracking-wider">
+                      Permanent Action
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 leading-relaxed font-sans">
+                {confirmModal.message ||
+                  "Are you sure you want to permanently delete this item? This action cannot be undone."}
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const action = confirmModal.onConfirm;
+                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                    if (action) {
+                      try {
+                        await action();
+                      } catch (err: any) {
+                        alert(err?.message || "Failed to complete deletion");
+                      }
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md shadow-red-600/30 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{confirmModal.confirmLabel || "Delete Permanently"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
