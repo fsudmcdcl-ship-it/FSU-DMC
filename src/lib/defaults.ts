@@ -528,5 +528,90 @@ export const DEFAULT_DB_STATE: DatabaseState = {
       imageUrl: "https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=800",
       order: 5
     }
+  },
+  portalEntries: {
+    "portal-1": {
+      id: "portal-1",
+      badge: "Directory",
+      title: "Campus Staff Directory",
+      description: "View key administrative and operational staff →",
+      targetRoute: "campus-staff",
+      order: 1,
+      isPublished: true,
+    },
+    "portal-2": {
+      id: "portal-2",
+      badge: "Faculty",
+      title: "Professors & Academic Directory",
+      description: "BBS, B.Ed, BA faculty and professors →",
+      targetRoute: "professors",
+      order: 2,
+      isPublished: true,
+    },
+    "portal-3": {
+      id: "portal-3",
+      badge: "Student Support",
+      title: "Unique FSU Helpdesk",
+      description: "FAQs & student ticket grievance portal →",
+      targetRoute: "fsu-helpdesk",
+      order: 3,
+      isPublished: true,
+    },
+    "portal-4": {
+      id: "portal-4",
+      badge: "Events & Calendar",
+      title: "Upcoming Campus Events",
+      description: "Live countdowns and event registrations →",
+      targetRoute: "upcoming-event",
+      order: 4,
+      isPublished: true,
+    }
+  },
+  upcomingEvents: {
+    "event-1": {
+      id: "event-1",
+      title: "Inter-College Sports & Cultural Meet 2083",
+      images: [
+        "https://images.unsplash.com/photo-1531415080290-bc98545ab2ef?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80&w=800"
+      ],
+      resourceLink: "https://fwu.edu.np",
+      resourceLinkLabel: "Download Event Notice & Rulebook (PDF)",
+      eventDate: "2026-10-15T09:30:00",
+      location: "Campus Sports Ground & Main Auditorium",
+      description: "District-level sports meet featuring cricket, volleyball, badminton tournaments, and cultural performances by student representatives across Darchula district campuses.",
+      isPublished: true,
+      createdAt: 1785000000000,
+    },
+    "event-2": {
+      id: "event-2",
+      title: "FSU Student Orientation & Academic Assembly",
+      images: [
+        "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800"
+      ],
+      resourceLink: "https://forms.gle/fsudmc-orientation-2083",
+      resourceLinkLabel: "Register for Student Assembly",
+      eventDate: "2026-09-23T13:00:00",
+      location: "Main Academic Block Seminar Hall",
+      description: "Comprehensive welcoming orientation for newly enrolled BBS, B.Ed, and BA students with campus leadership, department heads, and FSU representatives.",
+      isPublished: true,
+      createdAt: 1784900000000,
+    },
+    "event-3": {
+      id: "event-3",
+      title: "Digital Pedagogy & ICT in Education Workshop",
+      images: [
+        "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&q=80&w=800"
+      ],
+      resourceLink: "https://fwu.edu.np",
+      resourceLinkLabel: "Download Workshop Summary Report (PDF)",
+      eventDate: "2026-09-10T10:00:00",
+      location: "Central Computer Lab & ICT Wing",
+      description: "Practical 10-day hands-on workshop on digital learning platforms, computer-aided instruction, and research paper citation toolkits.",
+      isPublished: true,
+      createdAt: 1784000000000,
+    }
   }
 };

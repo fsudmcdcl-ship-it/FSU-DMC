@@ -1,6 +1,6 @@
 import React from "react";
 import { GeneralSettings } from "../types";
-import { Shield, BookOpen, ExternalLink, HelpCircle, Users, GraduationCap, Building2, Mail, MapPin, Search } from "lucide-react";
+import { Shield, BookOpen, ExternalLink, HelpCircle, Users, GraduationCap, Building2, Mail, MapPin, Search, Calendar } from "lucide-react";
 
 interface FooterProps {
   settings?: GeneralSettings;
@@ -123,6 +123,16 @@ export default function Footer({ onNavigate, onOpenTracker }: FooterProps) {
               >
                 <HelpCircle className="w-3.5 h-3.5 text-amber-500" />
                 <span>Unique FSU Helpdesk</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href="/upcoming-event"
+                onClick={(e) => handleNav("upcoming-event", e)}
+                className="hover:text-amber-400 transition flex items-center gap-2"
+              >
+                <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                <span>Upcoming Events (/upcoming-event)</span>
               </a>
             </li>
             <li>

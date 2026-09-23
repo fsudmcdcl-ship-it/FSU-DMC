@@ -17,6 +17,8 @@ import RichTextEditor from "./cms/RichTextEditor";
 import FaqManager from "./cms/FaqManager";
 import AdminAccountsManager from "./cms/AdminAccountsManager";
 import TrackingSettingsManager from "./cms/TrackingSettingsManager";
+import CampusPortalManager from "./cms/CampusPortalManager";
+import UpcomingEventsManager from "./cms/UpcomingEventsManager";
 import {
   DatabaseState,
   GeneralSettings,
@@ -72,7 +74,9 @@ import {
   Clock,
   BookOpen,
   Phone,
-  RefreshCw
+  RefreshCw,
+  LayoutGrid,
+  Calendar
 } from "lucide-react";
 
 interface CMSPanelProps {
@@ -92,6 +96,8 @@ type CMSTab =
   | "popup"
   | "staff"
   | "professors"
+  | "portal"
+  | "upcoming-events"
   | "helpdesk"
   | "faqs"
   | "tracking"
@@ -1214,6 +1220,26 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           >
             <GraduationCap className="w-4 h-4 text-purple-700" />
             <span>Professors & Faculty</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("portal")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "portal" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4 text-amber-500" />
+            <span>Campus Portal Shortcuts</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("upcoming-events")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "upcoming-events" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-amber-500" />
+            <span>Upcoming Events (/upcoming-event)</span>
           </button>
 
           <button
@@ -2559,8 +2585,10 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                 <p className="text-xs text-gray-500">Manage administrative, examination, finance, and library staff members.</p>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add New Staff Member</span>
+              <div id="staff-crud-form" className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  {editingStaffId ? "Edit Staff Member" : "Add New Staff Member"}
+                </span>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs font-medium text-gray-600 block mb-1">Full Name</label>
@@ -2638,13 +2666,24 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                   placeholder="https://... or upload staff member photo"
                 />
 
-                <button
-                  onClick={addStaff}
-                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Staff Member Live</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={saveOrUpdateStaff}
+                    className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    {editingStaffId ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    <span>{editingStaffId ? "Update Staff Member Live" : "Add Staff Member Live"}</span>
+                  </button>
+                  {editingStaffId && (
+                    <button
+                      type="button"
+                      onClick={cancelEditStaff}
+                      className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Staff List */}
@@ -2660,12 +2699,22 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                         <span className="text-[10px] text-slate-400 font-mono block mt-1">{s.email} &bull; {s.phone}</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => deleteItem("staff", s.id)}
-                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => startEditStaff(s)}
+                        className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg transition"
+                        title="Edit Staff"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => requestDeleteStaff(s)}
+                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
+                        title="Delete Staff"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2676,31 +2725,50 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           {activeTab === "professors" && (
             <div className="space-y-6">
               <div className="border-b border-gray-100 pb-4">
-                <h3 className="text-xl font-serif font-black text-slate-900">Professors & Academic Faculty</h3>
-                <p className="text-xs text-gray-500">Manage academic professors, lecturers, and heads of departments.</p>
+                <h3 className="text-xl font-serif font-black text-slate-900">Professors &amp; Academic Faculty Directory</h3>
+                <p className="text-xs text-gray-500">
+                  Manage academic records, designations, departments, qualifications, subjects, and biographical profiles for faculty members.
+                </p>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add Faculty Member</span>
+              {/* Professor Form */}
+              <div id="prof-crud-form" className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    {editingProfId ? "Edit Faculty Member Record" : "Add New Faculty Member"}
+                  </span>
+                  {editingProfId && (
+                    <span className="text-[11px] font-mono bg-blue-100 text-blue-950 font-bold px-2 py-0.5 rounded-md">
+                      Editing: {editingProfId}
+                    </span>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Full Name with Prefix</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">
+                      Full Name with Prefix <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
+                      required
                       value={newProf.name}
                       onChange={(e) => setNewProf({ ...newProf, name: e.target.value })}
-                      placeholder="e.g., Assoc. Prof. Dr. Dinesh Bhatt"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      placeholder="e.g., Assoc. Prof. Dr. Dinesh Kumar Bhatt"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Academic Title</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">
+                      Academic Designation / Title <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
+                      required
                       value={newProf.title}
                       onChange={(e) => setNewProf({ ...newProf, title: e.target.value })}
                       placeholder="Campus Chief & Associate Professor"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
                     />
                   </div>
                   <div>
@@ -2708,7 +2776,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                     <select
                       value={newProf.faculty}
                       onChange={(e) => setNewProf({ ...newProf, faculty: e.target.value })}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
                     >
                       <option value="Faculty of Management">Faculty of Management</option>
                       <option value="Faculty of Education">Faculty of Education</option>
@@ -2719,23 +2787,23 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Department</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Academic Department</label>
                     <input
                       type="text"
                       value={newProf.department}
                       onChange={(e) => setNewProf({ ...newProf, department: e.target.value })}
-                      placeholder="Business Administration"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      placeholder="Business Administration & Strategy"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Qualification</label>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Qualification & Degrees</label>
                     <input
                       type="text"
                       value={newProf.qualification}
                       onChange={(e) => setNewProf({ ...newProf, qualification: e.target.value })}
-                      placeholder="Ph.D. in Management, M.Phil"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      placeholder="Ph.D. in Management, M.Phil, MBS"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
                     />
                   </div>
                   <div>
@@ -2745,50 +2813,282 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                       value={profSubjectsInput}
                       onChange={(e) => setProfSubjectsInput(e.target.value)}
                       placeholder="Strategic Management, Research Methods"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
                     />
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Official Email</label>
+                    <input
+                      type="email"
+                      value={newProf.email}
+                      onChange={(e) => setNewProf({ ...newProf, email: e.target.value })}
+                      placeholder="faculty@fsudmc.com"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Phone / Extension</label>
+                    <input
+                      type="text"
+                      value={newProf.phone || ""}
+                      onChange={(e) => setNewProf({ ...newProf, phone: e.target.value })}
+                      placeholder="+977-9848712345"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Office Hours / Consultation</label>
+                    <input
+                      type="text"
+                      value={newProf.officeHours || ""}
+                      onChange={(e) => setNewProf({ ...newProf, officeHours: e.target.value })}
+                      placeholder="Sunday – Thursday: 11:00 AM – 1:00 PM"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
+                    Research Interests &amp; Specialization
+                  </label>
+                  <input
+                    type="text"
+                    value={newProf.researchInterests || ""}
+                    onChange={(e) => setNewProf({ ...newProf, researchInterests: e.target.value })}
+                    placeholder="Higher Education Leadership, Mountain Regional Economic Development..."
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
+                    Faculty Biography &amp; Academic Background
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newProf.bio || ""}
+                    onChange={(e) => setNewProf({ ...newProf, bio: e.target.value })}
+                    placeholder="Enter professor's academic biography, scholarly accomplishments, awards, and contributions to Darchula Multiple Campus..."
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
                 <ImageUploadInput
-                  label="Faculty / Professor Photo"
+                  label="Faculty / Professor Portrait Photo"
                   value={newProf.imageUrl}
                   onChange={(url) => setNewProf({ ...newProf, imageUrl: url })}
                   placeholder="https://... or upload professor portrait"
                 />
 
-                <button
-                  onClick={addProfessor}
-                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Professor Live</span>
-                </button>
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={saveOrUpdateProf}
+                    className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    {editingProfId ? <Check className="w-4 h-4 text-amber-400" /> : <Plus className="w-4 h-4 text-amber-400" />}
+                    <span>{editingProfId ? "Update Professor Live" : "Add Professor Live"}</span>
+                  </button>
+                  {editingProfId && (
+                    <button
+                      type="button"
+                      onClick={cancelEditProf}
+                      className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Professor List */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {professors.map((p) => (
-                  <div key={p.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <img src={p.imageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200"} alt={p.name} className="w-12 h-12 rounded-xl object-cover border" />
-                      <div>
-                        <h4 className="font-bold text-sm text-slate-900">{p.name}</h4>
-                        <span className="text-xs text-purple-900 font-bold block">{p.title}</span>
-                        <span className="text-[11px] text-slate-500 block">{p.faculty} &bull; {p.department}</span>
-                        <span className="text-[10px] text-slate-400 font-mono block mt-1">{p.qualification}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => deleteItem("professors", p.id)}
-                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+              {/* CLEAN TABLE PREVIEW (TASK 3B) */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-serif font-black text-slate-900">
+                      Active Faculty Table Preview ({professors.length})
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Direct Edit and Delete actions with instant database synchronization.
+                    </p>
                   </div>
-                ))}
+
+                  {/* Filter and Search */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={profSearchQuery}
+                        onChange={(e) => setProfSearchQuery(e.target.value)}
+                        placeholder="Search name, title, dept..."
+                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-900"
+                      />
+                    </div>
+
+                    <select
+                      value={profFacultyFilter}
+                      onChange={(e) => setProfFacultyFilter(e.target.value)}
+                      className="py-1.5 px-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-900"
+                    >
+                      <option value="all">All Faculties</option>
+                      <option value="Faculty of Management">Management</option>
+                      <option value="Faculty of Education">Education</option>
+                      <option value="Faculty of Humanities & Social Sciences">Humanities</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                          <th className="py-3 px-4">Faculty Member</th>
+                          <th className="py-3 px-4">Title / Role</th>
+                          <th className="py-3 px-4">Department &amp; Faculty</th>
+                          <th className="py-3 px-4">Qualification &amp; Bio</th>
+                          <th className="py-3 px-4">Contact</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {professors
+                          .filter((p) => {
+                            const matchesFaculty =
+                              profFacultyFilter === "all" || p.faculty === profFacultyFilter;
+                            const matchesSearch =
+                              !profSearchQuery ||
+                              p.name.toLowerCase().includes(profSearchQuery.toLowerCase()) ||
+                              p.title.toLowerCase().includes(profSearchQuery.toLowerCase()) ||
+                              p.department.toLowerCase().includes(profSearchQuery.toLowerCase());
+                            return matchesFaculty && matchesSearch;
+                          })
+                          .map((p) => (
+                            <tr
+                              key={p.id}
+                              className={`hover:bg-slate-50/80 transition-colors ${
+                                editingProfId === p.id ? "bg-amber-50/30" : ""
+                              }`}
+                            >
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={
+                                      p.imageUrl ||
+                                      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200"
+                                    }
+                                    alt={p.name}
+                                    className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
+                                  />
+                                  <div>
+                                    <span className="font-bold text-slate-900 block leading-tight">
+                                      {p.name}
+                                    </span>
+                                    <span className="text-[10px] text-emerald-600 font-mono font-bold">
+                                      Active Faculty
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-4 font-semibold text-purple-950">
+                                {p.title}
+                              </td>
+
+                              <td className="py-3 px-4">
+                                <span className="font-medium text-slate-800 block">
+                                  {p.department}
+                                </span>
+                                <span className="text-[10px] text-slate-500">
+                                  {p.faculty}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-4 max-w-xs">
+                                <span className="font-mono text-[11px] text-slate-700 block font-semibold">
+                                  {p.qualification}
+                                </span>
+                                {p.bio ? (
+                                  <p className="text-[11px] text-slate-500 line-clamp-1 italic mt-0.5">
+                                    &ldquo;{p.bio}&rdquo;
+                                  </p>
+                                ) : (
+                                  p.researchInterests && (
+                                    <span className="text-[10px] text-slate-400 line-clamp-1">
+                                      Res: {p.researchInterests}
+                                    </span>
+                                  )
+                                )}
+                              </td>
+
+                              <td className="py-3 px-4 text-slate-500">
+                                <span className="block font-mono text-[10px] text-slate-600">
+                                  {p.email}
+                                </span>
+                                {p.phone && (
+                                  <span className="block font-mono text-[10px] text-slate-400">
+                                    {p.phone}
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditProf(p)}
+                                    className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg transition cursor-pointer"
+                                    title="Edit Professor Record"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => requestDeleteProf(p)}
+                                    className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition cursor-pointer"
+                                    title="Delete Professor Record"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {professors.length === 0 && (
+                    <div className="p-8 text-center text-slate-400 text-xs">
+                      No professors or faculty members found.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+          )}
+
+          {/* TAB: CAMPUS PORTAL SHORTCUTS MANAGER */}
+          {activeTab === "portal" && (
+            <CampusPortalManager
+              state={state}
+              onShowToast={showToast}
+              onRequestConfirmDelete={setConfirmModal}
+            />
+          )}
+
+          {/* TAB: UPCOMING EVENTS MANAGER */}
+          {activeTab === "upcoming-events" && (
+            <UpcomingEventsManager
+              state={state}
+              onShowToast={showToast}
+              onRequestConfirmDelete={setConfirmModal}
+            />
           )}
 
           {/* TAB 10: HELPDESK & EMERGENCY HOTLINE SETTINGS */}

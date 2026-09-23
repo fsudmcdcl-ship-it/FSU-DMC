@@ -197,6 +197,29 @@ export interface ImportantNotice {
   bannerTextNp?: string;
 }
 
+export interface CampusPortalEntry {
+  id: string;
+  title: string;
+  badge: string;
+  description: string;
+  targetRoute: string; // Internal route like 'campus-staff', 'professors', 'upcoming-event', 'fsu-helpdesk' or URL
+  isPublished?: boolean;
+  order?: number;
+}
+
+export interface UpcomingEvent {
+  id: string;
+  title: string; // Required
+  images: string[]; // Array of max 2 media/image URLs
+  resourceLink?: string; // URL for PDF download or Registration form
+  eventDate: string; // ISO DateTime or Date string e.g. "2026-10-15T10:00:00"
+  description?: string;
+  location?: string;
+  resourceLinkLabel?: string;
+  isPublished?: boolean;
+  createdAt?: number;
+}
+
 export interface DatabaseState {
   generalSettings: GeneralSettings;
   slides: Record<string, SlideItem>;
@@ -212,4 +235,6 @@ export interface DatabaseState {
   courses?: Record<string, CourseItem>;
   trackingSettings?: ComplaintTrackingSettings;
   admins?: Record<string, SystemAdmin>;
+  portalEntries?: Record<string, CampusPortalEntry>;
+  upcomingEvents?: Record<string, UpcomingEvent>;
 }

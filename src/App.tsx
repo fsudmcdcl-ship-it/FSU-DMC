@@ -12,6 +12,9 @@ import {
   BlogItem,
   StaffItem,
   ProfessorItem,
+  CampusPortalEntry,
+  UpcomingEvent,
+  CourseItem
 } from "./types";
 import { DEFAULT_DB_STATE } from "./lib/defaults";
 import {
@@ -59,9 +62,9 @@ import SecretariatPage from "./pages/SecretariatPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsPage from "./pages/TermsPage";
 import NotFoundPage from "./pages/NotFoundPage";
-import { CourseItem } from "./types";
+import UpcomingEventPage from "./pages/UpcomingEventPage";
 
-import { ArrowDown, Facebook, GraduationCap, ShieldCheck, ExternalLink, Search } from "lucide-react";
+import { ArrowDown, Facebook, GraduationCap, ShieldCheck, ExternalLink, Search, LayoutGrid } from "lucide-react";
 
 export type RouteType =
   | "home"
@@ -72,6 +75,7 @@ export type RouteType =
   | "fsu-team"
   | "student-blogs"
   | "contact"
+  | "upcoming-event"
   | "campuslogin"
   | "databasemessage2083"
   | "privacy-policy"
@@ -125,6 +129,7 @@ export default function App() {
       if (pageParam === "syllabus-notes") return { route: "syllabus-notes" };
       if (pageParam === "fsu-team") return { route: "fsu-team" };
       if (pageParam === "student-blogs") return { route: "student-blogs" };
+      if (pageParam === "upcoming-event" || pageParam === "upcoming-events") return { route: "upcoming-event" };
       if (pageParam === "contact") return { route: "contact" };
       if (pageParam === "privacy-policy") return { route: "privacy-policy" };
       if (pageParam === "terms-and-conditions") return { route: "terms-and-conditions" };
@@ -148,6 +153,8 @@ export default function App() {
       if (hash === "#syllabus-notes" || hash === "#/syllabus-notes") return { route: "syllabus-notes" };
       if (hash === "#fsu-team" || hash === "#/fsu-team") return { route: "fsu-team" };
       if (hash === "#student-blogs" || hash === "#/student-blogs") return { route: "student-blogs" };
+      if (hash === "#upcoming-event" || hash === "#/upcoming-event" || hash === "#upcoming-events" || hash === "#/upcoming-events")
+        return { route: "upcoming-event" };
       if (hash === "#contact" || hash === "#/contact") return { route: "contact" };
       if (hash === "#privacy-policy" || hash === "#/privacy-policy") return { route: "privacy-policy" };
       if (hash === "#terms-and-conditions" || hash === "#/terms-and-conditions") return { route: "terms-and-conditions" };
@@ -178,6 +185,7 @@ export default function App() {
     if (path.endsWith("/syllabus-notes")) return { route: "syllabus-notes" };
     if (path.endsWith("/fsu-team")) return { route: "fsu-team" };
     if (path.endsWith("/student-blogs")) return { route: "student-blogs" };
+    if (path.endsWith("/upcoming-event") || path.endsWith("/upcoming-events")) return { route: "upcoming-event" };
     if (path.endsWith("/contact")) return { route: "contact" };
     if (path.endsWith("/privacy-policy")) return { route: "privacy-policy" };
     if (path.endsWith("/terms-and-conditions")) return { route: "terms-and-conditions" };
@@ -276,6 +284,8 @@ export default function App() {
       "professors",
       "faqs",
       "trackingSettings",
+      "portalEntries",
+      "upcomingEvents",
     ];
 
     let loadedCount = 0;
@@ -337,6 +347,17 @@ export default function App() {
   const staff: StaffItem[] | undefined = dbState?.staff ? (Object.values(dbState.staff) as StaffItem[]) : undefined;
   const professors: ProfessorItem[] | undefined = dbState?.professors ? (Object.values(dbState.professors) as ProfessorItem[]) : undefined;
   const importantNotice: ImportantNotice = dbState?.importantNotice || ({ active: false } as ImportantNotice);
+
+  const portalEntries: CampusPortalEntry[] = dbState?.portalEntries
+    ? Object.values(dbState.portalEntries)
+    : Object.values(DEFAULT_DB_STATE.portalEntries || {});
+  const activePortalEntries = [...portalEntries]
+    .filter((p) => p.isPublished !== false)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const upcomingEvents: UpcomingEvent[] = dbState?.upcomingEvents
+    ? Object.values(dbState.upcomingEvents)
+    : Object.values(DEFAULT_DB_STATE.upcomingEvents || {});
 
   const president = team.find((m) => m.order === 1);
 
@@ -569,46 +590,51 @@ export default function App() {
               <MessagesSection settings={settings} president={president} />
             </section>
 
-            {/* QUICK DIRECTORY SHORTCUTS */}
-            <section className="bg-gradient-to-br from-slate-900 to-blue-950 text-white p-8 md:p-10 rounded-3xl shadow-md grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="space-y-2">
-                <h3 className="font-serif font-black text-amber-400 text-lg">Campus Portal</h3>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Quick access to all essential directories, syllabus archives, grievance channels, and academic administration.
-                </p>
+            {/* CAMPUS PORTAL SHORTCUTS */}
+            <section className="bg-gradient-to-br from-slate-900 to-blue-950 text-white p-8 md:p-10 rounded-3xl shadow-md space-y-6">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-5">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-amber-400 font-mono">
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Campus Services &amp; Portals</span>
+                  </div>
+                  <h3 className="font-serif font-black text-amber-400 text-2xl">Campus Portal</h3>
+                  <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                    Quick access to all essential directories, syllabus archives, upcoming event countdowns, grievance channels, and academic administration.
+                  </p>
+                </div>
               </div>
 
-              <div
-                onClick={() => navigateTo("campus-staff")}
-                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
-              >
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Directory</span>
-                  <h4 className="font-bold text-sm text-white mt-1">Campus Staff Directory</h4>
-                </div>
-                <span className="text-[11px] text-blue-200 mt-2">View 8 key administrative staff →</span>
-              </div>
-
-              <div
-                onClick={() => navigateTo("professors")}
-                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
-              >
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Faculty</span>
-                  <h4 className="font-bold text-sm text-white mt-1">Professors & Academic Directory</h4>
-                </div>
-                <span className="text-[11px] text-blue-200 mt-2">BBS, B.Ed, BA faculty members →</span>
-              </div>
-
-              <div
-                onClick={() => navigateTo("fsu-helpdesk")}
-                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
-              >
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Student Support</span>
-                  <h4 className="font-bold text-sm text-white mt-1">Unique FSU Helpdesk</h4>
-                </div>
-                <span className="text-[11px] text-blue-200 mt-2">FAQs & student ticket submission →</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {activePortalEntries.map((portal) => (
+                  <div
+                    key={portal.id}
+                    onClick={() => {
+                      if (portal.targetRoute.startsWith("http://") || portal.targetRoute.startsWith("https://")) {
+                        window.open(portal.targetRoute, "_blank", "noopener,noreferrer");
+                      } else {
+                        navigateTo(portal.targetRoute.replace(/^\//, "") as RouteType);
+                      }
+                    }}
+                    className="p-5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 hover:border-amber-400/40 cursor-pointer transition flex flex-col justify-between group shadow-sm"
+                  >
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider font-mono">
+                        {portal.badge || "Portal"}
+                      </span>
+                      <h4 className="font-bold text-sm text-white group-hover:text-amber-300 transition-colors">
+                        {portal.title}
+                      </h4>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {portal.description}
+                      </p>
+                    </div>
+                    <div className="pt-3 text-[11px] text-blue-200 group-hover:text-amber-300 font-semibold flex items-center gap-1">
+                      <span>Access portal</span>
+                      <span>→</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
 
@@ -683,6 +709,12 @@ export default function App() {
           />
         )}
         {currentRoute === "contact" && <ContactPage />}
+        {currentRoute === "upcoming-event" && (
+          <UpcomingEventPage
+            events={upcomingEvents}
+            onNavigateHome={() => navigateTo("home")}
+          />
+        )}
         {currentRoute === "campus-staff" && <CampusStaffPage staff={staff} />}
         {currentRoute === "professors" && <ProfessorsPage professors={professors} />}
         {currentRoute === "fsu-helpdesk" && <HelpdeskPage faqs={dbState?.faqs} />}

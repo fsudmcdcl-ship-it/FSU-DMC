@@ -53,6 +53,7 @@ export default function Header({
     { id: "syllabus-notes", label: "SYLLABUS/NOTES", slug: "/syllabus-notes" },
     { id: "fsu-team", label: "FSU TEAM", slug: "/fsu-team" },
     { id: "student-blogs", label: "STUDENT BLOGS", slug: "/student-blogs" },
+    { id: "upcoming-event", label: "UPCOMING EVENT", slug: "/upcoming-event" },
     { id: "contact", label: "CONTACT", slug: "/contact" },
   ];
 

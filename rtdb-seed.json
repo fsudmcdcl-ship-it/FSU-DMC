@@ -182,5 +182,65 @@
     "type": "both",
     "bannerTextEn": "⚠️ CRITICAL CAMPUS ANNOUNCEMENT",
     "bannerTextNp": "⚠️ स्वतन्त्र विद्यार्थी युनियन विशेष सूचना"
+  },
+  "portalEntries": {
+    "portal_staff": {
+      "id": "portal_staff",
+      "title": "Campus Staff Directory",
+      "badge": "Directory",
+      "description": "View administrative personnel, examination officers, and campus administration.",
+      "targetRoute": "campus-staff",
+      "order": 1,
+      "isPublished": true,
+      "updatedAt": 1784534400000
+    },
+    "portal_professors": {
+      "id": "portal_professors",
+      "title": "Professors & Academic Faculty",
+      "badge": "Faculty",
+      "description": "BBS, B.Ed, and BA academic faculty members, heads of departments, and professors.",
+      "targetRoute": "professors",
+      "order": 2,
+      "isPublished": true,
+      "updatedAt": 1784534400000
+    },
+    "portal_helpdesk": {
+      "id": "portal_helpdesk",
+      "title": "Unique FSU Helpdesk",
+      "badge": "Student Support",
+      "description": "Frequently asked questions, online inquiry submission, and grievance tracking.",
+      "targetRoute": "fsu-helpdesk",
+      "order": 3,
+      "isPublished": true,
+      "updatedAt": 1784534400000
+    },
+    "portal_upcoming_events": {
+      "id": "portal_upcoming_events",
+      "title": "Upcoming Campus Events",
+      "badge": "Live Events",
+      "description": "Live countdown, sports tournaments, cultural days, and academic seminars.",
+      "targetRoute": "upcoming-event",
+      "order": 4,
+      "isPublished": true,
+      "updatedAt": 1784534400000
+    }
+  },
+  "upcomingEvents": {
+    "event_sports_meet_2083": {
+      "id": "event_sports_meet_2083",
+      "title": "Annual Inter-Faculty FSU Sports Tournament 2083",
+      "eventDate": "2083-05-15T09:00:00",
+      "location": "Darchula Multiple Campus Sports Arena, Khalanga",
+      "description": "Annual student athletic meet featuring football, volleyball, badminton tournaments, and track and field competitions with live commentary and trophy ceremonies.",
+      "images": [
+        "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&q=80&w=1200",
+        "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&q=80&w=1200"
+      ],
+      "resourceLink": "https://fsudmc.com/downloads/sports-schedule-2083.pdf",
+      "resourceLinkLabel": "Download Tournament Schedule (PDF)",
+      "isPublished": true,
+      "createdAt": 1784534400000,
+      "updatedAt": 1784534400000
+    }
   }
 }

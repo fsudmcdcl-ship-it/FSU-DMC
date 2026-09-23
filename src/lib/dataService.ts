@@ -69,6 +69,7 @@ export function loadInitialDbState(): DatabaseState {
     "importantNotice",
     "slides",
     "news",
+    "courses",
     "downloads",
     "blogs",
     "team",
@@ -78,6 +79,8 @@ export function loadInitialDbState(): DatabaseState {
     "trackingSettings",
     "admins",
     "contacts",
+    "portalEntries",
+    "upcomingEvents",
   ];
 
   for (const key of keys) {
