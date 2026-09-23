@@ -100,7 +100,9 @@ export default function ProfessorsPage({ professors }: ProfessorsPageProps) {
   const [selectedFaculty, setSelectedFaculty] = useState("All Faculties");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const professorList = professors && professors.length > 0 ? professors : PROFESSORS;
+  const professorList = (professors !== undefined && professors !== null)
+    ? professors.filter((p) => !p.status || p.status === "active")
+    : PROFESSORS;
 
   const filteredProfessors = professorList.filter((prof) => {
     const matchesFaculty = selectedFaculty === "All Faculties" || prof.faculty === selectedFaculty;
@@ -222,6 +224,11 @@ export default function ProfessorsPage({ professors }: ProfessorsPageProps) {
                   <p className="text-slate-500 italic text-[11px] leading-relaxed">
                     {prof.researchInterests}
                   </p>
+                  {prof.bio && (
+                    <p className="text-slate-600 text-[11px] leading-relaxed mt-1.5 pt-1.5 border-t border-slate-100">
+                      {prof.bio}
+                    </p>
+                  )}
                 </div>
 
                 <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-500">

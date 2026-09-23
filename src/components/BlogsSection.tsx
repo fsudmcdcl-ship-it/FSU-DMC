@@ -54,6 +54,7 @@ export default function BlogsSection({
     });
   };
 
+  const activeBlogs = blogs.filter((b) => !b.status || b.status === "published");
   const selectedBlog = blogs.find((b) => b.id === selectedBlogId);
 
   return (
@@ -71,13 +72,13 @@ export default function BlogsSection({
       </div>
 
       {/* 3-Column Grid of Blogs */}
-      {blogs.length === 0 ? (
+      {activeBlogs.length === 0 ? (
         <div className="bg-white p-12 text-center rounded-3xl border border-dashed border-slate-200">
           <p className="text-gray-400 font-mono text-xs">No blogs or articles published yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {blogs.map((blog) => (
+          {activeBlogs.map((blog) => (
             <div
               key={blog.id}
               onClick={() => handleSelectBlog(blog.id)}

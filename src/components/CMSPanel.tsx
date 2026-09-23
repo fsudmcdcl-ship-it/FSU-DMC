@@ -63,7 +63,16 @@ import {
   AlertCircle,
   Loader2,
   Landmark,
-  Facebook
+  Facebook,
+  Archive,
+  Check,
+  Search,
+  AlertTriangle,
+  X,
+  Clock,
+  BookOpen,
+  Phone,
+  RefreshCw
 } from "lucide-react";
 
 interface CMSPanelProps {
@@ -146,7 +155,41 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [newMember, setNewMember] = useState({ nameEn: "", roleEn: "", imageUrl: "", order: 6 });
   const [newDownload, setNewDownload] = useState({ titleEn: "", fileUrl: "", isDriveLink: true });
-  const [newBlog, setNewBlog] = useState({ headingEn: "", bodyEn: "", imageUrl: "", authorEn: "" });
+  // In-app Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    confirmStyle?: "danger" | "warning";
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  // Blogs CRUD State
+  const [editingBlogId, setEditingBlogId] = useState<string | null>(null);
+  const [newBlog, setNewBlog] = useState<{
+    headingEn: string;
+    authorEn: string;
+    bodyEn: string;
+    imageUrl: string;
+    status: "published" | "draft" | "archived";
+  }>({
+    headingEn: "",
+    authorEn: "",
+    bodyEn: "",
+    imageUrl: "",
+    status: "published",
+  });
+  const [blogSearchQuery, setBlogSearchQuery] = useState("");
+  const [blogStatusFilter, setBlogStatusFilter] = useState<"all" | "published" | "draft" | "archived">("all");
+
+  // Staff CRUD State
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [newStaff, setNewStaff] = useState<Omit<StaffItem, "id">>({
     name: "",
     designation: "",
@@ -155,8 +198,15 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     phone: "",
     office: "",
     workingHours: "Sunday – Friday: 10:00 AM – 5:00 PM",
-    imageUrl: ""
+    imageUrl: "",
+    status: "active",
+    order: 1,
   });
+  const [staffSearchQuery, setStaffSearchQuery] = useState("");
+  const [staffDeptFilter, setStaffDeptFilter] = useState("all");
+
+  // Professors CRUD State
+  const [editingProfId, setEditingProfId] = useState<string | null>(null);
   const [newProf, setNewProf] = useState<Omit<ProfessorItem, "id">>({
     name: "",
     title: "",
@@ -165,11 +215,17 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     qualification: "",
     subjects: [],
     researchInterests: "",
+    bio: "",
     email: "",
+    phone: "",
     officeHours: "Sunday – Thursday: 11:00 AM – 1:00 PM",
-    imageUrl: ""
+    imageUrl: "",
+    status: "active",
+    order: 1,
   });
   const [profSubjectsInput, setProfSubjectsInput] = useState("");
+  const [profSearchQuery, setProfSearchQuery] = useState("");
+  const [profFacultyFilter, setProfFacultyFilter] = useState("all");
 
   useEffect(() => {
     const unsubscribe = onAdminAuthStateChanged((currUser) => {
@@ -501,68 +557,292 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     } catch (err: any) { alert(err?.message || err); }
   };
 
-  const addBlog = async () => {
-    if (!newBlog.headingEn || !newBlog.bodyEn) return alert("Please specify article heading and content.");
-    try {
-      const id = `blog_${Date.now()}`;
-      await saveSubItem("blogs", id, { id, ...newBlog, createdAt: Date.now() });
-      setNewBlog({ headingEn: "", bodyEn: "", imageUrl: "", authorEn: "" });
-      showToast("Student blog article published live!");
-    } catch (err: any) { alert(err?.message || err); }
+  // ==========================================
+  // BLOGS CRUD HANDLERS
+  // ==========================================
+  const startEditBlog = (item: BlogItem) => {
+    setEditingBlogId(item.id);
+    setNewBlog({
+      headingEn: item.headingEn,
+      authorEn: item.authorEn || "",
+      bodyEn: item.bodyEn,
+      imageUrl: item.imageUrl || "",
+      status: item.status || "published",
+    });
+    const el = document.getElementById("blogs-crud-form");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const addStaff = async () => {
-    if (!newStaff.name || !newStaff.designation) return alert("Please specify staff name and designation.");
+  const cancelEditBlog = () => {
+    setEditingBlogId(null);
+    setNewBlog({
+      headingEn: "",
+      authorEn: "",
+      bodyEn: "",
+      imageUrl: "",
+      status: "published",
+    });
+  };
+
+  const saveOrUpdateBlog = async () => {
+    if (!newBlog.headingEn.trim()) {
+      alert("Please specify the blog article heading/title.");
+      return;
+    }
+    if (!newBlog.bodyEn.trim()) {
+      alert("Please write the content for the blog article.");
+      return;
+    }
+
     try {
-      const id = `staff_${Date.now()}`;
-      await saveSubItem("staff", id, { id, ...newStaff });
-      setNewStaff({
-        name: "",
-        designation: "",
-        department: "Administration",
-        email: "",
-        phone: "",
-        office: "",
-        workingHours: "Sunday – Friday: 10:00 AM – 5:00 PM",
-        imageUrl: ""
+      if (editingBlogId) {
+        const existing = blogs.find((b) => b.id === editingBlogId);
+        await saveSubItem("blogs", editingBlogId, {
+          id: editingBlogId,
+          createdAt: existing?.createdAt || Date.now(),
+          ...newBlog,
+        });
+        showToast("Blog article updated live successfully!");
+      } else {
+        const id = `blog_${Date.now()}`;
+        await saveSubItem("blogs", id, {
+          id,
+          createdAt: Date.now(),
+          ...newBlog,
+        });
+        showToast("New student blog article published live!");
+      }
+      cancelEditBlog();
+    } catch (err: any) {
+      alert(err?.message || err);
+    }
+  };
+
+  const toggleBlogStatus = async (blog: BlogItem) => {
+    const nextStatus = blog.status === "archived" ? "published" : "archived";
+    try {
+      await saveSubItem("blogs", blog.id, {
+        ...blog,
+        status: nextStatus,
       });
-      showToast("Campus staff member saved!");
-    } catch (err: any) { alert(err?.message || err); }
+      showToast(nextStatus === "archived" ? "Blog archived (hidden from live site)." : "Blog published live!");
+    } catch (err: any) {
+      alert(err?.message || err);
+    }
   };
 
-  const addProfessor = async () => {
-    if (!newProf.name || !newProf.title) return alert("Please specify professor name and academic title.");
+  const requestDeleteBlog = (blog: BlogItem) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Blog Article?",
+      message: `Are you sure you want to permanently delete "${blog.headingEn}"? This action cannot be undone.`,
+      confirmLabel: "Permanently Delete",
+      confirmStyle: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteSubItem("blogs", blog.id);
+          if (editingBlogId === blog.id) cancelEditBlog();
+          showToast("Blog article deleted successfully.");
+        } catch (err: any) {
+          alert(err?.message || err);
+        }
+      },
+    });
+  };
+
+  // ==========================================
+  // STAFF CRUD HANDLERS
+  // ==========================================
+  const startEditStaff = (member: StaffItem) => {
+    setEditingStaffId(member.id);
+    setNewStaff({
+      name: member.name,
+      designation: member.designation,
+      department: member.department,
+      email: member.email,
+      phone: member.phone,
+      office: member.office,
+      workingHours: member.workingHours || "Sunday – Friday: 10:00 AM – 5:00 PM",
+      imageUrl: member.imageUrl || "",
+      status: member.status || "active",
+      order: member.order || 1,
+    });
+    const el = document.getElementById("staff-crud-form");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const cancelEditStaff = () => {
+    setEditingStaffId(null);
+    setNewStaff({
+      name: "",
+      designation: "",
+      department: "Administration",
+      email: "",
+      phone: "",
+      office: "",
+      workingHours: "Sunday – Friday: 10:00 AM – 5:00 PM",
+      imageUrl: "",
+      status: "active",
+      order: (staff.length || 0) + 1,
+    });
+  };
+
+  const saveOrUpdateStaff = async () => {
+    if (!newStaff.name.trim()) {
+      alert("Please specify the staff member's full name.");
+      return;
+    }
+    if (!newStaff.designation.trim()) {
+      alert("Please specify the staff designation/role.");
+      return;
+    }
+
     try {
-      const id = `prof_${Date.now()}`;
+      const id = editingStaffId || `staff_${Date.now()}`;
+      await saveSubItem("staff", id, {
+        id,
+        ...newStaff,
+      });
+      showToast(editingStaffId ? "Campus staff profile updated live!" : "New staff member added live to directory!");
+      cancelEditStaff();
+    } catch (err: any) {
+      alert(err?.message || err);
+    }
+  };
+
+  const requestDeleteStaff = (member: StaffItem) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Staff Member?",
+      message: `Are you sure you want to remove ${member.name} (${member.designation}) from the campus directory?`,
+      confirmLabel: "Delete Member",
+      confirmStyle: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteSubItem("staff", member.id);
+          if (editingStaffId === member.id) cancelEditStaff();
+          showToast(`Staff record for ${member.name} deleted.`);
+        } catch (err: any) {
+          alert(err?.message || err);
+        }
+      },
+    });
+  };
+
+  // ==========================================
+  // PROFESSORS & FACULTY CRUD HANDLERS
+  // ==========================================
+  const startEditProf = (prof: ProfessorItem) => {
+    setEditingProfId(prof.id);
+    setNewProf({
+      name: prof.name,
+      title: prof.title,
+      faculty: prof.faculty,
+      department: prof.department,
+      qualification: prof.qualification,
+      subjects: prof.subjects || [],
+      researchInterests: prof.researchInterests || "",
+      bio: prof.bio || "",
+      email: prof.email,
+      phone: prof.phone || "",
+      officeHours: prof.officeHours || "Sunday – Thursday: 11:00 AM – 1:00 PM",
+      imageUrl: prof.imageUrl || "",
+      status: prof.status || "active",
+      order: prof.order || 1,
+    });
+    setProfSubjectsInput((prof.subjects || []).join(", "));
+    const el = document.getElementById("prof-crud-form");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const cancelEditProf = () => {
+    setEditingProfId(null);
+    setNewProf({
+      name: "",
+      title: "",
+      faculty: "Faculty of Management",
+      department: "",
+      qualification: "",
+      subjects: [],
+      researchInterests: "",
+      bio: "",
+      email: "",
+      phone: "",
+      officeHours: "Sunday – Thursday: 11:00 AM – 1:00 PM",
+      imageUrl: "",
+      status: "active",
+      order: (professors.length || 0) + 1,
+    });
+    setProfSubjectsInput("");
+  };
+
+  const saveOrUpdateProf = async () => {
+    if (!newProf.name.trim()) {
+      alert("Please specify the professor/faculty member's name.");
+      return;
+    }
+    if (!newProf.title.trim()) {
+      alert("Please specify the academic title or designation.");
+      return;
+    }
+
+    try {
       const subjectsArray = profSubjectsInput
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      await saveSubItem("professors", id, { id, ...newProf, subjects: subjectsArray });
-      setNewProf({
-        name: "",
-        title: "",
-        faculty: "Faculty of Management",
-        department: "",
-        qualification: "",
-        subjects: [],
-        researchInterests: "",
-        email: "",
-        officeHours: "Sunday – Thursday: 11:00 AM – 1:00 PM",
-        imageUrl: ""
+
+      const id = editingProfId || `prof_${Date.now()}`;
+      await saveSubItem("professors", id, {
+        id,
+        ...newProf,
+        subjects: subjectsArray,
       });
-      setProfSubjectsInput("");
-      showToast("Professor published live!");
-    } catch (err: any) { alert(err?.message || err); }
+      showToast(editingProfId ? "Faculty academic record updated live!" : "New professor added live to faculty directory!");
+      cancelEditProf();
+    } catch (err: any) {
+      alert(err?.message || err);
+    }
   };
 
-  // Deleting items
-  const deleteItem = async (node: string, id: string) => {
-    if (!window.confirm("Permanently delete this item?")) return;
-    try {
-      await deleteSubItem(node as keyof DatabaseState, id);
-      showToast("Item removed.");
-    } catch (err: any) { alert(err?.message || err); }
+  const requestDeleteProf = (prof: ProfessorItem) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Faculty Record?",
+      message: `Are you sure you want to remove ${prof.name} (${prof.title}) from the academic faculty directory?`,
+      confirmLabel: "Delete Faculty",
+      confirmStyle: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteSubItem("professors", prof.id);
+          if (editingProfId === prof.id) cancelEditProf();
+          showToast(`Faculty record for ${prof.name} deleted.`);
+        } catch (err: any) {
+          alert(err?.message || err);
+        }
+      },
+    });
+  };
+
+  // Safe In-App Delete Handler for general nodes
+  const deleteItem = async (node: string, id: string, label?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Confirm Deletion",
+      message: label
+        ? `Are you sure you want to delete "${label}"? This action cannot be undone.`
+        : "Are you sure you want to permanently delete this item? This action cannot be undone.",
+      confirmLabel: "Permanently Delete",
+      confirmStyle: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteSubItem(node as keyof DatabaseState, id);
+          showToast("Item permanently removed.");
+        } catch (err: any) {
+          alert(err?.message || err);
+        }
+      },
+    });
   };
 
   // Master Save All Functionality
@@ -1875,77 +2155,311 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             </div>
           )}
 
-          {/* TAB 6: BLOGS */}
+          {/* TAB 6: BLOGS - FULL CRUD EDITORIAL MANAGEMENT */}
           {activeTab === "blogs" && (
             <div className="space-y-6">
-              <div className="border-b border-gray-100 pb-4">
-                <h3 className="text-xl font-serif font-black text-slate-900">Student Blogs & Articles</h3>
-                <p className="text-xs text-gray-500">Publish articles, essays, and opinion pieces authored by campus students.</p>
+              {/* Header & Overview Stats */}
+              <div className="border-b border-gray-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-serif font-black text-slate-900 flex items-center gap-2">
+                    <PenTool className="w-5 h-5 text-blue-900" />
+                    Student Blogs & Editorial Management
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Create, edit, publish, archive, and manage articles authored by campus students and scholars.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full font-bold">
+                    Total: {blogs.length}
+                  </span>
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold">
+                    Published: {blogs.filter((b) => !b.status || b.status === "published").length}
+                  </span>
+                  <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold">
+                    Archived: {blogs.filter((b) => b.status === "archived").length}
+                  </span>
+                </div>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Add New Student Blog</span>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Article Heading</label>
+              {/* Blog Create / Edit Form */}
+              <div id="blogs-crud-form" className={`p-5 rounded-2xl border transition-all ${
+                editingBlogId 
+                  ? "bg-amber-50/50 border-amber-300 shadow-md ring-2 ring-amber-400/20" 
+                  : "bg-slate-50 border-slate-200"
+              } space-y-4`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {editingBlogId ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-600 text-white text-xs font-bold uppercase tracking-wider">
+                        <Edit className="w-3.5 h-3.5" />
+                        Editing Blog Article
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                        Write & Publish New Student Blog
+                      </span>
+                    )}
+                    {editingBlogId && (
+                      <span className="text-xs text-slate-500 font-mono">
+                        (ID: {editingBlogId})
+                      </span>
+                    )}
+                  </div>
+                  {editingBlogId && (
+                    <button
+                      type="button"
+                      onClick={cancelEditBlog}
+                      className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Cancel Edit</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-medium text-gray-700 block mb-1">
+                      Article Heading / Title *
+                    </label>
                     <input
                       type="text"
                       value={newBlog.headingEn}
                       onChange={(e) => setNewBlog({ ...newBlog, headingEn: e.target.value })}
-                      placeholder="Title of the article"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      placeholder="e.g., Reflections on Higher Education in Far-Western Nepal"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Author Name & Class</label>
-                    <input
-                      type="text"
-                      value={newBlog.authorEn}
-                      onChange={(e) => setNewBlog({ ...newBlog, authorEn: e.target.value })}
-                      placeholder="e.g., Amit Joshi, BBS 3rd Year"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
-                    />
+                    <label className="text-xs font-medium text-gray-700 block mb-1">
+                      Publication Status
+                    </label>
+                    <select
+                      value={newBlog.status || "published"}
+                      onChange={(e) => setNewBlog({ ...newBlog, status: e.target.value as any })}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    >
+                      <option value="published">Published (Visible on Live Website)</option>
+                      <option value="draft">Draft (Saved in CMS Only)</option>
+                      <option value="archived">Archived (Hidden from Public)</option>
+                    </select>
                   </div>
                 </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-700 block mb-1">
+                    Author Name & Class / Faculty *
+                  </label>
+                  <input
+                    type="text"
+                    value={newBlog.authorEn}
+                    onChange={(e) => setNewBlog({ ...newBlog, authorEn: e.target.value })}
+                    placeholder="e.g., Amit Joshi, BBS 3rd Year"
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                  />
+                </div>
+
                 <div>
                   <RichTextEditor
                     label="Article Body Content *"
                     value={newBlog.bodyEn}
                     onChange={(val) => setNewBlog({ ...newBlog, bodyEn: val })}
-                    placeholder="Full article content (supports formatting, headings, bullet lists, blockquotes, and links)..."
+                    placeholder="Write or paste full article content (supports formatting, headings, bullet lists, blockquotes, and links)..."
                   />
                 </div>
+
                 <ImageUploadInput
                   label="Header Feature Image"
                   value={newBlog.imageUrl}
                   onChange={(url) => setNewBlog({ ...newBlog, imageUrl: url })}
                   placeholder="https://... or upload header photo"
                 />
-                <button
-                  onClick={addBlog}
-                  className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Publish Blog Live</span>
-                </button>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={saveOrUpdateBlog}
+                    className={`px-6 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm text-white cursor-pointer ${
+                      editingBlogId
+                        ? "bg-emerald-700 hover:bg-emerald-800"
+                        : "bg-blue-950 hover:bg-blue-900"
+                    }`}
+                  >
+                    {editingBlogId ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Update Blog Article Live</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        <span>Publish Blog Live</span>
+                      </>
+                    )}
+                  </button>
+
+                  {editingBlogId && (
+                    <button
+                      type="button"
+                      onClick={cancelEditBlog}
+                      className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {blogs.map((b) => (
-                  <div key={b.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900">{b.headingEn}</h4>
-                      <span className="text-[11px] text-red-700 font-bold block mt-0.5">Author: {b.authorEn}</span>
-                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{b.bodyEn}</p>
-                    </div>
-                    <button
-                      onClick={() => deleteItem("blogs", b.id)}
-                      className="p-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+              {/* Blogs Directory List / Table Preview */}
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                  {/* Search bar */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search blogs by title or author..."
+                      value={blogSearchQuery}
+                      onChange={(e) => setBlogSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    />
                   </div>
-                ))}
+
+                  {/* Status filter tabs */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto">
+                    {(["all", "published", "draft", "archived"] as const).map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setBlogStatusFilter(status)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition cursor-pointer ${
+                          blogStatusFilter === status
+                            ? "bg-blue-950 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Blog Rows */}
+                {blogs
+                  .filter((b) => {
+                    const matchesSearch =
+                      b.headingEn.toLowerCase().includes(blogSearchQuery.toLowerCase()) ||
+                      (b.authorEn || "").toLowerCase().includes(blogSearchQuery.toLowerCase());
+                    const currentStatus = b.status || "published";
+                    const matchesStatus =
+                      blogStatusFilter === "all" || currentStatus === blogStatusFilter;
+                    return matchesSearch && matchesStatus;
+                  })
+                  .map((b) => {
+                    const status = b.status || "published";
+                    const isEditing = editingBlogId === b.id;
+
+                    return (
+                      <div
+                        key={b.id}
+                        className={`p-4 bg-white rounded-2xl border transition-all shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                          isEditing
+                            ? "border-amber-400 bg-amber-50/20 ring-2 ring-amber-300/30"
+                            : "border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-start gap-4 flex-1">
+                          {b.imageUrl ? (
+                            <img
+                              src={b.imageUrl}
+                              alt={b.headingEn}
+                              className="w-16 h-16 rounded-xl object-cover border border-slate-100 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-xl bg-blue-50 border border-blue-100 text-blue-900 flex items-center justify-center shrink-0">
+                              <PenTool className="w-6 h-6 text-blue-800" />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-bold text-sm text-slate-900">{b.headingEn}</h4>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                                  status === "published"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : status === "archived"
+                                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                                    : "bg-slate-100 text-slate-600 border-slate-200"
+                                }`}
+                              >
+                                {status}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                              <span className="font-semibold text-red-700">Author: {b.authorEn}</span>
+                              {b.createdAt && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-[11px] font-mono">
+                                    {new Date(b.createdAt).toLocaleDateString()}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            <p className="text-xs text-slate-600 line-clamp-2 mt-1">
+                              {b.bodyEn.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                          <button
+                            type="button"
+                            onClick={() => startEditBlog(b)}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            title="Edit Blog"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleBlogStatus(b)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                              status === "archived"
+                                ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                                : "bg-amber-50 hover:bg-amber-100 text-amber-700"
+                            }`}
+                            title={status === "archived" ? "Publish blog live" : "Archive blog"}
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                            <span>{status === "archived" ? "Publish" : "Archive"}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => requestDeleteBlog(b)}
+                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition cursor-pointer"
+                            title="Delete Blog"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {blogs.length === 0 && (
+                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">
+                    No student blogs currently found. Write and publish your first article above.
+                  </div>
+                )}
               </div>
             </div>
           )}

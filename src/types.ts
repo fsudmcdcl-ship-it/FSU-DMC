@@ -78,13 +78,14 @@ export interface DownloadItem {
 export interface BlogItem {
   id: string;
   headingEn: string;
-  headingNp: string;
+  headingNp?: string;
   bodyEn: string;
-  bodyNp: string;
+  bodyNp?: string;
   imageUrl?: string;
   authorEn: string;
-  authorNp: string;
+  authorNp?: string;
   createdAt: number;
+  status?: "published" | "draft" | "archived";
 }
 
 export interface TeamMember {
@@ -162,6 +163,8 @@ export interface StaffItem {
   office: string;
   workingHours: string;
   imageUrl: string;
+  status?: "active" | "inactive";
+  order?: number;
 }
 
 export interface ProfessorItem {
@@ -173,9 +176,13 @@ export interface ProfessorItem {
   qualification: string;
   subjects: string[];
   researchInterests: string;
+  bio?: string;
   email: string;
   officeHours: string;
   imageUrl: string;
+  phone?: string;
+  status?: "active" | "inactive";
+  order?: number;
 }
 
 export interface ImportantNotice {

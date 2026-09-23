@@ -112,7 +112,9 @@ export default function CampusStaffPage({ staff }: CampusStaffPageProps) {
   const [selectedDept, setSelectedDept] = useState("All Departments");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const staffList = staff && staff.length > 0 ? staff : STAFF_MEMBERS;
+  const staffList = (staff !== undefined && staff !== null)
+    ? staff.filter((m) => !m.status || m.status === "active")
+    : STAFF_MEMBERS;
 
   const filteredStaff = staffList.filter((member) => {
     const matchesDept = selectedDept === "All Departments" || member.department === selectedDept;
