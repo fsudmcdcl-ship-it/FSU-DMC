@@ -40,6 +40,9 @@ import CMSPanel from "./components/CMSPanel";
 import MessagesViewer from "./components/MessagesViewer";
 import CoursesCarousel from "./components/CoursesCarousel";
 import CourseDetailModal from "./components/CourseDetailModal";
+import RecentNoticesModal from "./components/RecentNoticesModal";
+import NoticeDetailModal from "./components/NoticeDetailModal";
+import { createNoticeSlug } from "./utils/noticeSlug";
 
 // Page Views
 import AboutPage from "./pages/AboutPage";
@@ -90,6 +93,8 @@ export default function App() {
 
   // Notice and modal focus states
   const [forceNoticeTrigger, setForceNoticeTrigger] = useState(0);
+  const [showRecentNoticesModal, setShowRecentNoticesModal] = useState(false);
+  const [viewingNotice, setViewingNotice] = useState<NewsItem | null>(null);
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
   const [selectedBlogId, setSelectedBlogId] = useState<string | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<CourseItem | null>(null);
@@ -103,6 +108,11 @@ export default function App() {
     const hash = rawHash.toLowerCase();
     const params = new URLSearchParams(window.location.search);
     const pageParam = params.get("page")?.toLowerCase();
+
+    // Check direct notice link (?notice=slug or ?notice=id)
+    if (params.get("notice")) {
+      return { route: "notices" };
+    }
 
     // Check query params
     if (pageParam) {
@@ -404,19 +414,56 @@ export default function App() {
         forceOpenTrigger={forceNoticeTrigger}
       />
 
+      {/* Structured Recent News & Notices Modal */}
+      <RecentNoticesModal
+        isOpen={showRecentNoticesModal}
+        onClose={() => setShowRecentNoticesModal(false)}
+        news={news}
+        importantNotice={importantNotice}
+        onSelectNotice={(noticeId) => {
+          setShowRecentNoticesModal(false);
+          const item = news.find((n) => n.id === noticeId);
+          if (item) {
+            const slug = createNoticeSlug(item.headingEn, item.id);
+            window.history.pushState(
+              { noticeId: item.id },
+              "",
+              `${window.location.origin}/notices?notice=${encodeURIComponent(slug)}`
+            );
+            setSelectedNewsId(item.id);
+            navigateTo("notices");
+          }
+        }}
+        onViewAllNotices={() => {
+          setShowRecentNoticesModal(false);
+          navigateTo("notices");
+        }}
+      />
+
       {/* Main Clean English Header with Sticky Behavior */}
       <Header
         settings={settings}
+        newsCount={news.length}
         activeSection={currentRoute}
         onNavClick={(sectionId) => navigateTo(sectionId as RouteType)}
-        onOpenImportantNotice={() => setForceNoticeTrigger((prev) => prev + 1)}
+        onOpenImportantNotice={() => setShowRecentNoticesModal(true)}
       />
 
       {/* Sliding announcements ticker */}
       <Marquee
         news={news}
         onNewsClick={(id) => {
-          setSelectedNewsId(id);
+          const item = news.find((n) => n.id === id);
+          if (item) {
+            const slug = createNoticeSlug(item.headingEn, item.id);
+            window.history.pushState(
+              { noticeId: item.id },
+              "",
+              `${window.location.origin}/notices?notice=${encodeURIComponent(slug)}`
+            );
+            setSelectedNewsId(item.id);
+            navigateTo("notices");
+          }
         }}
       />
 
@@ -486,7 +533,23 @@ export default function App() {
                 news={news}
                 settings={settings}
                 selectedNewsId={selectedNewsId}
-                setSelectedNewsId={setSelectedNewsId}
+                setSelectedNewsId={(id) => {
+                  if (id) {
+                    const item = news.find((n) => n.id === id);
+                    if (item) {
+                      const slug = createNoticeSlug(item.headingEn, item.id);
+                      window.history.pushState(
+                        { noticeId: item.id },
+                        "",
+                        `${window.location.origin}/notices?notice=${encodeURIComponent(slug)}`
+                      );
+                      setSelectedNewsId(item.id);
+                      navigateTo("notices");
+                    }
+                  } else {
+                    setSelectedNewsId(null);
+                  }
+                }}
               />
             </section>
 
@@ -678,6 +741,14 @@ export default function App() {
         <CourseDetailModal
           course={selectedCourse}
           onClose={() => setSelectedCourse(null)}
+        />
+      )}
+
+      {/* Global Notice Details Modal */}
+      {viewingNotice && currentRoute !== "notices" && (
+        <NoticeDetailModal
+          notice={viewingNotice}
+          onClose={() => setViewingNotice(null)}
         />
       )}
     </div>
