@@ -171,13 +171,6 @@ export default function Header({
             })}
           </div>
 
-          {/* Right side info / domain */}
-          <div className="text-xs text-blue-200 font-mono hidden lg:flex items-center gap-2">
-            <span className="font-semibold text-amber-300">fsudmc.com</span>
-            <span>|</span>
-            <span>Darchula, Nepal</span>
-          </div>
-
           {/* Mobile menu toggle */}
           <div className="md:hidden flex w-full justify-between items-center">
             <span className="text-xs uppercase font-bold tracking-wider text-blue-200 font-mono">
