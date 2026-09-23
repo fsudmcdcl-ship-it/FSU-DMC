@@ -6,6 +6,7 @@ import {
   AdminUser,
   onAdminAuthStateChanged,
   signInAdminWithEmail,
+  signInAdminWithGoogle,
   signOutAdmin,
   resetPasswordAdmin,
   getCurrentAdminUser,
@@ -15,7 +16,7 @@ import {
 import ImageUploadInput from "./ImageUploadInput";
 import RichTextEditor from "./cms/RichTextEditor";
 import FaqManager from "./cms/FaqManager";
-import AdminAccountsManager from "./cms/AdminAccountsManager";
+import AccountInfoManager from "./cms/AccountInfoManager";
 import TrackingSettingsManager from "./cms/TrackingSettingsManager";
 import CampusPortalManager from "./cms/CampusPortalManager";
 import UpcomingEventsManager from "./cms/UpcomingEventsManager";
@@ -235,17 +236,16 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const [profFacultyFilter, setProfFacultyFilter] = useState("all");
 
   useEffect(() => {
-    // Require username and password entry every time user visits or opens the CMS panel
-    setUser(null);
-    signOutAdmin();
-    setUsername("");
-    setPassword("");
-    setAuthError("");
-    setAuthSuccess("");
+    // Synchronize with Firebase Auth session state
+    const unsubscribe = onAdminAuthStateChanged((activeUser) => {
+      setUser(activeUser);
+      if (activeUser) {
+        setAuthError("");
+      }
+    });
 
     return () => {
-      // Clear active session when navigating away from the CMS panel
-      signOutAdmin();
+      unsubscribe();
     };
   }, []);
 
@@ -262,26 +262,20 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const handleSignOut = async () => {
     await signOutAdmin();
     setUser(null);
-    setUsername("");
+    setEmail("");
     setPassword("");
     setAuthError("");
     setAuthSuccess("");
   };
 
   const handleExitToHome = () => {
-    signOutAdmin();
-    setUser(null);
-    setUsername("");
-    setPassword("");
-    setAuthError("");
-    setAuthSuccess("");
     onGoHome();
   };
 
-  const handleCredentialsLogin = async (e: React.FormEvent) => {
+  const handleEmailPasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password) {
-      setAuthError("Please provide both administrator username and password.");
+    if (!email.trim() || !password) {
+      setAuthError("Please provide both administrator email and password.");
       return;
     }
 
@@ -290,15 +284,10 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     setAuthSuccess("");
 
     try {
-      const res = await loginAdminWithCredentials(username.trim(), password);
-      if (res.success && res.user) {
-        setUser(res.user);
-        setAuthError("");
-        setPassword(""); // Clear sensitive password from memory
-        showToast(`Welcome back, ${res.user.fullName || res.user.username}!`);
-      } else {
-        setAuthError(res.error || "Authentication failed. Invalid username or password.");
-      }
+      const loggedUser = await signInAdminWithEmail(email.trim(), password);
+      setUser(loggedUser);
+      setPassword("");
+      showToast(`Welcome back, ${loggedUser.displayName || loggedUser.email}!`);
     } catch (err: any) {
       console.error("Auth Error:", err);
       setAuthError(err.message || "Failed to authenticate.");
@@ -307,36 +296,18 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     }
   };
 
-  const handleEmailPasswordLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setAuthError("Please enter both authorized admin email and password.");
-      return;
-    }
-
-    const trimmedEmail = email.trim();
+  const handleGoogleLogin = async () => {
     setLoginLoading(true);
     setAuthError("");
     setAuthSuccess("");
 
     try {
-      const loggedUser = await signInAdminWithEmail(trimmedEmail, password);
+      const loggedUser = await signInAdminWithGoogle();
       setUser(loggedUser);
-      setAuthError("");
-      showToast("Successfully signed in to FSU CMS Control Center!");
+      showToast(`Welcome, ${loggedUser.displayName || loggedUser.email}!`);
     } catch (err: any) {
-      console.error("Auth Error:", err);
-      let errMsg = "Failed to authenticate. Please check your credentials.";
-      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
-        errMsg = "Admin user not found or invalid credentials. If you need access, contact the FSU system administrator.";
-      } else if (err.code === "auth/wrong-password") {
-        errMsg = "Incorrect password. Click 'Forgot Password?' to reset it.";
-      } else if (err.code === "auth/too-many-requests") {
-        errMsg = "Access temporarily blocked due to repeated failed attempts. Please try again later or reset your password.";
-      } else if (err.message && !err.message.includes("api-key-not-valid")) {
-        errMsg = err.message;
-      }
-      setAuthError(errMsg);
+      console.error("Google Auth Error:", err);
+      setAuthError(err.message || "Google sign-in failed.");
     } finally {
       setLoginLoading(false);
     }
@@ -346,7 +317,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     e.preventDefault();
     const targetEmail = (resetEmail || email).trim();
     if (!targetEmail) {
-      setAuthError("Please enter your registered admin email address.");
+      setAuthError("Please enter your registered administrator email address.");
       return;
     }
 
@@ -355,16 +326,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     setAuthSuccess("");
 
     try {
-      const successMsg = await resetPasswordAdmin(targetEmail);
-      setAuthSuccess(successMsg);
+      await resetPasswordAdmin(targetEmail);
+      setAuthSuccess(`Password reset instructions have been sent to ${targetEmail}. Please check your inbox.`);
       setShowForgotPassword(false);
     } catch (err: any) {
       console.error("Password reset error:", err);
-      if (err.code === "auth/user-not-found") {
-        setAuthError("No registered administrator found with this email.");
-      } else {
-        setAuthError(err.message || "Failed to dispatch password reset email. Please try again.");
-      }
+      setAuthError(err.message || "Failed to dispatch password reset email. Please try again.");
     } finally {
       setResetLoading(false);
     }
@@ -902,7 +869,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     }
   };
 
-  // Login Screen Gate
+  // Login Screen Gate - Firebase Authentication
   if (!user) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4 bg-slate-50">
@@ -919,7 +886,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           </p>
 
           <p className="text-xs text-gray-500 mb-6 text-center leading-relaxed">
-            Authorized administrator portal for Free Student Union - DMC. Manage all website content, hero sliders, news, faculty, staff, syllabus, and emergency notices.
+            Authorized administrator portal for Free Student Union - DMC. Authenticate using your provisioned Google Firebase administrator credentials.
           </p>
 
           {authSuccess && (
@@ -936,22 +903,22 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             </div>
           )}
 
-          {/* Master / Secondary Admin Login Form */}
-          <form onSubmit={handleCredentialsLogin} className="w-full space-y-4">
+          {/* Firebase Auth Email & Password Login Form */}
+          <form onSubmit={handleEmailPasswordLogin} className="w-full space-y-4">
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Admin Username
+                Administrator Email
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                  <Users className="w-4 h-4" />
+                  <Mail className="w-4 h-4" />
                 </span>
                 <input
-                  type="text"
+                  type="email"
                   required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter administrator username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@fsudmc.com"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
                 />
               </div>
@@ -962,7 +929,13 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
                   Password
                 </label>
-                <span className="text-[10px] text-slate-400 font-mono">Case-sensitive</span>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(!showForgotPassword)}
+                  className="text-[11px] text-blue-800 hover:text-blue-950 font-bold hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
               </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
@@ -996,14 +969,83 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               ) : (
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
               )}
-              <span>Log In to CMS Panel</span>
+              <span>Sign In with Firebase Auth</span>
+            </button>
+
+            {/* Optional Google Sign-In */}
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loginLoading}
+              className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+              <span>Sign In with Google</span>
             </button>
           </form>
 
-          <div className="w-full mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
-            <span className="text-[11px] text-slate-500 font-medium">
-              🔒 <strong>Strict Authentication:</strong> Master and Secondary Admins must enter their username and password every time to access the CMS panel.
-            </span>
+          {/* Forgot password collapsible section */}
+          {showForgotPassword && (
+            <div className="w-full mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl animate-fade-in text-left">
+              <h4 className="text-xs font-bold text-slate-800 mb-1">Reset Password</h4>
+              <p className="text-[11px] text-slate-500 mb-3">
+                Enter your admin email to receive a password reset link from Firebase.
+              </p>
+              <form onSubmit={handleForgotPassword} className="space-y-2">
+                <input
+                  type="email"
+                  required
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="admin@fsudmc.com"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="flex-1 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-bold transition disabled:opacity-50"
+                  >
+                    {resetLoading ? "Sending..." : "Send Reset Link"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(false)}
+                    className="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Security & Owner Provisioning Notice */}
+          <div className="w-full mt-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-left space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Restricted Administrator Access</span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Public self-registration is permanently disabled. Administrator accounts can only be created and authorized by the site owner directly inside the Google Firebase Console.
+            </p>
           </div>
 
           <div className="w-full space-y-3 mt-4">
@@ -1012,45 +1054,6 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
             >
               ← Back to Main Public Page
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Role check: Complaint Handlers / Reviewers only have access to #messages, not broader CMS content
-  if (user && user.role === "reviewer") {
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center px-4 py-12">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-5">
-          <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-sm">
-            <ShieldCheck className="w-8 h-8" />
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold tracking-widest text-amber-700 font-mono block mb-1">
-              Restricted Role Workspace
-            </span>
-            <h2 className="text-xl font-serif font-black text-slate-900">
-              Complaint Handler / Reviewer
-            </h2>
-            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-              Your account is authorized specifically for reviewing student grievances, inquiries, and status updates on the Helpdesk Messages inbox. Managing institutional site content (notices, staff, syllabus) is reserved for Master and Secondary Admins.
-            </p>
-          </div>
-
-          <div className="pt-2 space-y-2">
-            <a
-              href="#messages"
-              className="w-full py-3 px-4 rounded-xl bg-blue-950 hover:bg-blue-900 text-white font-bold text-xs uppercase tracking-wider transition shadow-md flex items-center justify-center gap-2"
-            >
-              <span>Go to Messages Workstation</span>
-            </a>
-            <button
-              onClick={handleExitToHome}
-              className="w-full py-2 text-slate-500 hover:text-slate-900 text-xs font-bold transition cursor-pointer"
-            >
-              ← Return to Public Website
             </button>
           </div>
         </div>
@@ -1080,14 +1083,10 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           </h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className="text-xs text-blue-200/90 font-mono">
-              Admin: <strong className="text-emerald-300 font-bold">{user.fullName || user.username || user.email}</strong>
+              Admin: <strong className="text-emerald-300 font-bold">{user.email || user.fullName || user.displayName}</strong>
             </span>
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider font-mono ${
-              user.role === "master"
-                ? "bg-amber-400 text-slate-950 font-bold"
-                : "bg-blue-300 text-blue-950 font-bold"
-            }`}>
-              {user.role === "master" ? "Master Admin" : "Secondary Admin"}
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider font-mono bg-emerald-400 text-slate-950 font-bold">
+              Firebase Admin
             </span>
           </div>
         </div>
@@ -1309,14 +1308,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <KeyRound className="w-4 h-4 text-amber-500" />
-                <span>Admin Accounts & Roles</span>
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <span>Admin Profile &amp; Auth</span>
               </div>
-              {user.role === "master" && (
-                <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-bold text-[9px] uppercase font-mono">
-                  Master
-                </span>
-              )}
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-800 font-bold text-[9px] uppercase font-mono">
+                Firebase
+              </span>
             </button>
           </div>
         </div>
@@ -3200,18 +3197,11 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             <TrackingSettingsManager settings={state?.trackingSettings} onShowToast={showToast} />
           )}
 
-          {/* TAB 13: ADMIN ACCOUNTS & ROLE PERMISSIONS */}
+          {/* TAB 13: ADMIN PROFILE & AUTHENTICATION */}
           {activeTab === "admins" && (
-            <AdminAccountsManager
+            <AccountInfoManager
               currentUser={user}
               onShowToast={showToast}
-              onRequestConfirmDelete={(options) =>
-                setConfirmModal({
-                  isOpen: true,
-                  confirmStyle: "danger",
-                  ...options,
-                })
-              }
             />
           )}
 

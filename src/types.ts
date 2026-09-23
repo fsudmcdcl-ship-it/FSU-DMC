@@ -139,17 +139,29 @@ export interface ComplaintTrackingSettings {
   supportEmail?: string;
 }
 
-export type AdminRole = "master" | "secondary" | "reviewer";
+export interface AdminUser {
+  uid: string;
+  email: string;
+  displayName?: string;
+  fullName?: string;
+  username?: string;
+  photoURL?: string;
+  emailVerified?: boolean;
+  role?: string;
+  createdAt?: number;
+  status?: string;
+}
+
+export type AdminRole = "admin";
 
 export interface SystemAdmin {
   id: string;
   username: string;
-  password?: string;
-  role: AdminRole;
+  email?: string;
   fullName: string;
   createdAt: number;
-  lastLogin?: number;
-  status?: "active" | "locked" | "disabled";
+  role?: string;
+  status?: string;
   failedAttempts?: number;
 }
 

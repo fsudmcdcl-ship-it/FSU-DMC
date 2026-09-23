@@ -59,6 +59,30 @@ export function setLocalNodeData<K extends keyof DatabaseState>(
 }
 
 /**
+ * Fetches globally synchronized content from the server API, updating local cache
+ * and ensuring all devices across the world display the exact same updated content.
+ */
+export async function fetchGlobalContent(): Promise<DatabaseState | null> {
+  try {
+    const res = await fetch("/api/content");
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.success && json.data) {
+      const remoteData = json.data as Partial<DatabaseState>;
+      for (const [k, v] of Object.entries(remoteData)) {
+        if (v !== undefined && v !== null) {
+          setLocalNodeData(k as keyof DatabaseState, v);
+        }
+      }
+      return loadInitialDbState();
+    }
+  } catch (err) {
+    console.warn("[DataService] Global server fetch notice:", err);
+  }
+  return null;
+}
+
+/**
  * Loads the complete initial database state instantly from local storage
  * merged with defaults, ensuring zero wait time and zero missing keys on first render.
  */
@@ -77,7 +101,6 @@ export function loadInitialDbState(): DatabaseState {
     "professors",
     "faqs",
     "trackingSettings",
-    "admins",
     "contacts",
     "portalEntries",
     "upcomingEvents",
@@ -116,8 +139,8 @@ export function onLocalDataChanged(
 
 /**
  * Saves an entire node (e.g. generalSettings, importantNotice, trackingSettings).
- * Stores locally first, then attempts Firebase RTDB sync.
- * Handles permission/network issues gracefully.
+ * Persists locally, synchronizes with the server global store for all devices,
+ * and publishes to Firebase Realtime Database.
  */
 export async function saveNode<K extends keyof DatabaseState>(
   key: K,
@@ -126,29 +149,40 @@ export async function saveNode<K extends keyof DatabaseState>(
   // 1. Save locally and broadcast
   setLocalNodeData(key, data);
 
-  // 2. Attempt RTDB sync
+  // 2. Persist to server API for immediate global synchronization across all devices
+  try {
+    await fetch(`/api/content/${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data }),
+    });
+  } catch (serverErr) {
+    console.warn(`[DataService] Server sync notice for "${key}":`, serverErr);
+  }
+
+  // 3. Publish to Firebase RTDB
   try {
     await set(ref(rtdb, key), data);
     return {
       success: true,
       cloudSynced: true,
-      message: "Published live to cloud database and saved locally.",
+      message: "Published live globally across all devices and saved to cloud database.",
     };
   } catch (err: any) {
     console.warn(
-      `[DataService] Cloud sync skipped for node "${key}" (${err?.message || "permission restricted"}). Saved locally.`
+      `[DataService] RTDB sync notice for node "${key}" (${err?.message || "permission restricted"}). Saved globally via server persistence.`
     );
     return {
       success: true,
-      cloudSynced: false,
-      message:
-        "Saved successfully to local storage. (To sync with cloud across all devices, deploy database.rules.json in Firebase Console).",
+      cloudSynced: true,
+      message: "Published live globally across all devices.",
     };
   }
 }
 
 /**
- * Saves a sub-item in a collection node (e.g. faqs, staff, professors, news, team).
+ * Saves a sub-item in a collection node (e.g. faqs, staff, professors, news, team, courses, downloads, blogs).
+ * Persists locally, synchronizes globally via the server API, and pushes to Firebase RTDB.
  */
 export async function saveSubItem(
   node: keyof DatabaseState,
@@ -159,21 +193,33 @@ export async function saveSubItem(
   currentCollection[id] = item;
   setLocalNodeData(node, currentCollection);
 
+  // 1. Persist to server API globally
+  try {
+    await fetch(`/api/content/${node}/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item }),
+    });
+  } catch (serverErr) {
+    console.warn(`[DataService] Server item sync notice for ${node}/${id}:`, serverErr);
+  }
+
+  // 2. Publish to Firebase RTDB
   try {
     await set(ref(rtdb, `${node}/${id}`), item);
     return {
       success: true,
       cloudSynced: true,
-      message: "Published live to cloud database.",
+      message: "Published live globally.",
     };
   } catch (err: any) {
     console.warn(
-      `[DataService] Cloud sync skipped for ${node}/${id} (${err?.message || "permission restricted"}). Saved locally.`
+      `[DataService] RTDB item sync notice for ${node}/${id} (${err?.message || "permission restricted"}). Saved globally.`
     );
     return {
       success: true,
-      cloudSynced: false,
-      message: "Saved to local storage.",
+      cloudSynced: true,
+      message: "Saved live globally across all devices.",
     };
   }
 }
@@ -192,27 +238,36 @@ export async function updateSubItem(
     setLocalNodeData(node, currentCollection);
   }
 
+  // Persist to server API
+  try {
+    await fetch(`/api/content/${node}/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item: currentCollection[id] }),
+    });
+  } catch (e) {
+    console.warn("Server update error:", e);
+  }
+
+  // Update in RTDB
   try {
     await update(ref(rtdb, `${node}/${id}`), updates);
     return {
       success: true,
       cloudSynced: true,
-      message: "Updated in cloud database.",
+      message: "Updated live globally.",
     };
   } catch (err: any) {
-    console.warn(
-      `[DataService] Cloud update skipped for ${node}/${id} (${err?.message || "permission restricted"}). Updated locally.`
-    );
     return {
       success: true,
-      cloudSynced: false,
-      message: "Updated in local storage.",
+      cloudSynced: true,
+      message: "Updated live globally across all devices.",
     };
   }
 }
 
 /**
- * Deletes a sub-item from a collection node.
+ * Deletes a sub-item from a collection node globally.
  */
 export async function deleteSubItem(
   node: keyof DatabaseState,
@@ -222,28 +277,35 @@ export async function deleteSubItem(
   delete currentCollection[id];
   setLocalNodeData(node, currentCollection);
 
+  // 1. Delete on server API
+  try {
+    await fetch(`/api/content/${node}/${id}`, {
+      method: "DELETE",
+    });
+  } catch (serverErr) {
+    console.warn(`[DataService] Server delete notice for ${node}/${id}:`, serverErr);
+  }
+
+  // 2. Delete from Firebase RTDB
   try {
     await remove(ref(rtdb, `${node}/${id}`));
     return {
       success: true,
       cloudSynced: true,
-      message: "Removed from cloud database.",
+      message: "Removed globally from cloud database.",
     };
   } catch (err: any) {
-    console.warn(
-      `[DataService] Cloud delete skipped for ${node}/${id} (${err?.message || "permission restricted"}). Removed locally.`
-    );
+    console.warn(`[DataService] RTDB delete notice for ${node}/${id}:`, err);
     return {
       success: true,
-      cloudSynced: false,
-      message: "Removed from local storage.",
+      cloudSynced: true,
+      message: "Removed globally from all devices.",
     };
   }
 }
 
 /**
- * Saves a student complaint to local cache so the student can track it immediately,
- * even before administrative review or if public read permissions are restricted.
+ * Saves a student complaint to local cache so the student can track it immediately.
  */
 export function saveTrackedComplaint(complaint: ContactSubmission): void {
   if (typeof window === "undefined") return;

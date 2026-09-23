@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import crypto from "crypto";
 import fs from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
@@ -10,269 +9,105 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: "25mb" }));
+app.use(express.json({ limit: "50mb" }));
 
-// Server-side hash helper
-function hashPassword(pwd: string): string {
-  return crypto.createHash("sha256").update(pwd).digest("hex");
-}
-
-// Master admin config from environment variables (NEVER hardcoded in client or git)
-const MASTER_USER = process.env.MASTER_ADMIN_USERNAME || "dmcadmin";
-const MASTER_PASS = process.env.MASTER_ADMIN_PASSWORD || "Admin";
-const MASTER_PASS_HASH = hashPassword(MASTER_PASS);
-
-interface ServerAdminAccount {
-  id: string;
-  username: string;
-  passwordHash: string;
-  role: "master" | "secondary" | "reviewer";
-  fullName: string;
-  createdAt: number;
-  lastLogin?: number;
-  status: "active" | "locked" | "disabled";
-  failedAttempts: number;
-}
-
-// Persistent Admin Storage
 const DATA_DIR = path.join(process.cwd(), "data");
-const ADMINS_FILE = path.join(DATA_DIR, "admins.json");
+const CONTENT_FILE = path.join(DATA_DIR, "site-content.json");
+const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
 
-// Admin store
-const adminAccounts: Map<string, ServerAdminAccount> = new Map();
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
-function persistAdminsToFile() {
+// ==========================================
+// GLOBAL PERSISTENT SITE CONTENT STORE
+// ==========================================
+let siteContent: Record<string, any> = {};
+
+function initSiteContent() {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (fs.existsSync(CONTENT_FILE)) {
+      const raw = fs.readFileSync(CONTENT_FILE, "utf-8");
+      siteContent = JSON.parse(raw);
+    } else {
+      // Seed from rtdb-seed.json if available
+      const seedPath = path.join(process.cwd(), "rtdb-seed.json");
+      if (fs.existsSync(seedPath)) {
+        const seedRaw = fs.readFileSync(seedPath, "utf-8");
+        siteContent = JSON.parse(seedRaw);
+      }
+      fs.writeFileSync(CONTENT_FILE, JSON.stringify(siteContent, null, 2), "utf-8");
     }
-    const list = Array.from(adminAccounts.values());
-    fs.writeFileSync(ADMINS_FILE, JSON.stringify(list, null, 2), "utf-8");
   } catch (err) {
-    console.warn("Could not persist admins to file:", err);
+    console.error("Failed to initialize site content store:", err);
+    siteContent = {};
   }
 }
 
-function loadPersistedAdmins() {
+function persistContentToFile() {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (fs.existsSync(ADMINS_FILE)) {
-      const content = fs.readFileSync(ADMINS_FILE, "utf-8");
-      const list: ServerAdminAccount[] = JSON.parse(content);
-      list.forEach((acc) => {
-        if (acc && acc.username) {
-          adminAccounts.set(acc.username.toLowerCase(), acc);
-        }
-      });
-    }
+    fs.writeFileSync(CONTENT_FILE, JSON.stringify(siteContent, null, 2), "utf-8");
   } catch (err) {
-    console.warn("Could not load persisted admins from file:", err);
+    console.error("Could not persist site content to disk:", err);
   }
 }
 
-// Load existing persisted accounts first
-loadPersistedAdmins();
+initSiteContent();
 
-// Always guarantee Master Admin from env takes precedence and has fresh hash
-adminAccounts.set(MASTER_USER.toLowerCase(), {
-  id: "admin_master",
-  username: MASTER_USER,
-  passwordHash: MASTER_PASS_HASH,
-  role: "master",
-  fullName: "Master Administrator (DMC)",
-  createdAt: Date.now(),
-  status: "active",
-  failedAttempts: 0,
+// GET /api/content - Retrieve all site content for global device synchronization
+app.get("/api/content", (_req, res) => {
+  res.json({ success: true, data: siteContent });
 });
 
-persistAdminsToFile();
-
-// Auth Routes
-
-// 1. Login endpoint - ALWAYS requires matching username AND password
-app.post("/api/auth/login", (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password || typeof password !== "string" || !password.trim()) {
-    return res.status(400).json({ success: false, error: "Both username and password are required to log in." });
-  }
-
-  const normalizedUser = username.trim().toLowerCase();
-  const account = adminAccounts.get(normalizedUser);
-
-  if (!account) {
-    return res.status(401).json({ success: false, error: "Invalid administrator username or password." });
-  }
-
-  // Check if account is locked or disabled
-  if (account.status === "locked" || account.status === "disabled") {
-    return res.status(403).json({
-      success: false,
-      error: "This account is currently locked due to 3 consecutive failed login attempts. Please contact the Master Administrator to reactivate your access.",
-      isLocked: true,
-    });
-  }
-
-  // Ensure account has a passwordHash on record
-  if (!account.passwordHash) {
-    return res.status(403).json({
-      success: false,
-      error: "No password configured for this account. Please contact the Master Administrator.",
-    });
-  }
-
-  const incomingHash = hashPassword(password.trim());
-  const isMatch = incomingHash === account.passwordHash;
-
-  if (!isMatch) {
-    account.failedAttempts = (account.failedAttempts || 0) + 1;
-    if (account.failedAttempts >= 3) {
-      account.status = "locked";
-      persistAdminsToFile();
-      return res.status(403).json({
-        success: false,
-        error: "Incorrect password entered 3 consecutive times. Your account has now been LOCKED for security. Contact the Master Administrator to reactivate.",
-        isLocked: true,
-      });
-    }
-
-    persistAdminsToFile();
-    const attemptsRemaining = 3 - account.failedAttempts;
-    return res.status(401).json({
-      success: false,
-      error: `Invalid password. Warning: ${attemptsRemaining} attempt(s) remaining before account lockout.`,
-      attemptsRemaining,
-    });
-  }
-
-  // Successful login -> Reset failed attempts
-  account.failedAttempts = 0;
-  account.lastLogin = Date.now();
-  persistAdminsToFile();
-
-  return res.json({
-    success: true,
-    user: {
-      uid: account.id,
-      username: account.username,
-      fullName: account.fullName,
-      role: account.role,
-      status: account.status,
-    },
-  });
+// GET /api/content/:key - Retrieve a specific node
+app.get("/api/content/:key", (req, res) => {
+  const { key } = req.params;
+  const nodeData = siteContent[key] || null;
+  res.json({ success: true, data: nodeData });
 });
 
-// 2. Reactivate / Unlock Account (Master Admin only)
-app.post("/api/auth/unlock", (req, res) => {
-  const { targetUsername, requesterRole } = req.body;
-  if (requesterRole !== "master") {
-    return res.status(403).json({ success: false, error: "Account reactivation is restricted exclusively to the Master Administrator." });
+// POST /api/content/:key - Update an entire node (e.g., generalSettings, importantNotice, faqs)
+app.post("/api/content/:key", (req, res) => {
+  const { key } = req.params;
+  const { data } = req.body;
+  if (data === undefined) {
+    return res.status(400).json({ success: false, error: "Missing 'data' in request body." });
   }
 
-  const normalized = targetUsername?.trim().toLowerCase();
-  const account = adminAccounts.get(normalized);
-  if (!account) {
-    return res.status(404).json({ success: false, error: "Account not found." });
-  }
-
-  account.status = "active";
-  account.failedAttempts = 0;
-  persistAdminsToFile();
-
-  return res.json({
-    success: true,
-    message: `Account '${account.username}' has been successfully unlocked and reactivated.`,
-  });
+  siteContent[key] = data;
+  persistContentToFile();
+  console.log(`[Global Sync] Saved node "${key}" to server persistence across all devices.`);
+  res.json({ success: true, data: siteContent[key] });
 });
 
-// 3. Get all admins (Safe list without password hashes)
-app.get("/api/auth/admins", (req, res) => {
-  const list = Array.from(adminAccounts.values()).map((acc) => ({
-    id: acc.id,
-    username: acc.username,
-    role: acc.role,
-    fullName: acc.fullName,
-    createdAt: acc.createdAt,
-    lastLogin: acc.lastLogin,
-    status: acc.status,
-    failedAttempts: acc.failedAttempts,
-  }));
-  res.json({ success: true, admins: list });
+// POST /api/content/:node/:id - Add or update a sub-item in a collection (e.g. news, slides, team, downloads)
+app.post("/api/content/:node/:id", (req, res) => {
+  const { node, id } = req.params;
+  const { item } = req.body;
+  if (item === undefined) {
+    return res.status(400).json({ success: false, error: "Missing 'item' in request body." });
+  }
+
+  if (!siteContent[node] || typeof siteContent[node] !== "object") {
+    siteContent[node] = {};
+  }
+
+  siteContent[node][id] = item;
+  persistContentToFile();
+  console.log(`[Global Sync] Saved item "${node}/${id}" to server persistence.`);
+  res.json({ success: true, item: siteContent[node][id] });
 });
 
-// 4. Create Sub-Admin (Secondary or Reviewer)
-app.post("/api/auth/create-admin", (req, res) => {
-  const { username, password, fullName, role, requesterRole } = req.body;
-  if (requesterRole !== "master") {
-    return res.status(403).json({ success: false, error: "Only Master Admin can create administrator accounts." });
+// DELETE /api/content/:node/:id - Delete a sub-item from a collection
+app.delete("/api/content/:node/:id", (req, res) => {
+  const { node, id } = req.params;
+  if (siteContent[node] && siteContent[node][id]) {
+    delete siteContent[node][id];
+    persistContentToFile();
+    console.log(`[Global Sync] Deleted item "${node}/${id}" from server persistence.`);
+    return res.json({ success: true, message: "Item deleted successfully." });
   }
-
-  if (!username || !password || !fullName) {
-    return res.status(400).json({ success: false, error: "All fields are required." });
-  }
-
-  const normalized = username.trim().toLowerCase();
-  if (adminAccounts.has(normalized)) {
-    return res.status(400).json({ success: false, error: "An admin account with this username already exists." });
-  }
-
-  const targetRole = role === "reviewer" ? "reviewer" : "secondary";
-  const id = `admin_${Date.now()}`;
-  const newAccount: ServerAdminAccount = {
-    id,
-    username: username.trim(),
-    passwordHash: hashPassword(password),
-    role: targetRole,
-    fullName: fullName.trim(),
-    createdAt: Date.now(),
-    status: "active",
-    failedAttempts: 0,
-  };
-
-  adminAccounts.set(normalized, newAccount);
-  persistAdminsToFile();
-  return res.json({ success: true, message: `Account created for ${newAccount.username} (${targetRole}).` });
-});
-
-// 5. Delete Admin Account
-app.delete("/api/auth/admin/:username", (req, res) => {
-  const { requesterRole } = req.body;
-  const target = req.params.username.trim().toLowerCase();
-
-  if (requesterRole !== "master") {
-    return res.status(403).json({ success: false, error: "Only Master Admin can delete accounts." });
-  }
-
-  if (target === MASTER_USER.toLowerCase()) {
-    return res.status(400).json({ success: false, error: "Cannot delete the primary Master Admin account." });
-  }
-
-  if (!adminAccounts.has(target)) {
-    return res.status(404).json({ success: false, error: "Account not found." });
-  }
-
-  adminAccounts.delete(target);
-  persistAdminsToFile();
-  return res.json({ success: true, message: "Account deleted successfully." });
-});
-
-// 6. Change Password
-app.post("/api/auth/change-password", (req, res) => {
-  const { username, newPassword } = req.body;
-  if (!username || !newPassword || newPassword.length < 3) {
-    return res.status(400).json({ success: false, error: "Invalid password length." });
-  }
-
-  const normalized = username.trim().toLowerCase();
-  const account = adminAccounts.get(normalized);
-  if (!account) {
-    return res.status(404).json({ success: false, error: "Account not found." });
-  }
-
-  account.passwordHash = hashPassword(newPassword);
-  persistAdminsToFile();
-  return res.json({ success: true, message: "Password updated successfully." });
+  res.json({ success: true, message: "Item was not found or already deleted." });
 });
 
 // ==========================================
@@ -302,7 +137,6 @@ interface ServerMessage {
   adminRemarkUpdatedAt?: number;
 }
 
-const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
 let serverMessages: ServerMessage[] = [];
 
 const SEED_MESSAGES: ServerMessage[] = [
@@ -348,18 +182,18 @@ const SEED_MESSAGES: ServerMessage[] = [
   },
   {
     id: "FSU-COMP-901438",
-    name: "Sunita Bohara",
+    name: "Pooja Joshi",
     faculty: "BA (Bachelor of Arts)",
     semester: "2nd Year",
     className: "BA 2nd Year",
-    phone: "+977 9868923412",
-    email: "sunita.bohara@gmail.com",
-    category: "Scholarships & Financial Aid",
-    tag: "Secretariat Appointment",
-    subject: "[Secretariat Meeting Request] FWU Merit Scholarship Verification",
-    message: "Seeking FSU verification and recommendation letter for FWU underprivileged scholarship grant application before the upcoming campus deadline.",
+    phone: "+977 9868456789",
+    email: "pooja.joshi@gmail.com",
+    category: "Scholarship & Welfare",
+    tag: "FSU Helpdesk Ticket",
+    subject: "Remote Area Student Free-ship Form Submission deadline",
+    message: "Could the student union clarify if the recommendation letter from the local ward office needs to be notarized for the underprivileged Himalayan scholarship scheme?",
     status: "Resolved",
-    adminRemarks: "Document verified and official FSU recommendation signed by President Prakash Rawal. Dispatched to Administration Branch.",
+    adminRemarks: "Official ward letter with verified seal is sufficient. Notarization is not required per campus administration guidelines.",
     adminRemarkUpdatedAt: Date.now() - 3600000 * 12,
     trackingCode: "FSU-COMP-901438",
     ticketId: "FSU-COMP-901438",
@@ -370,9 +204,6 @@ const SEED_MESSAGES: ServerMessage[] = [
 
 function persistMessagesToFile() {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
     fs.writeFileSync(MESSAGES_FILE, JSON.stringify(serverMessages, null, 2), "utf-8");
   } catch (err) {
     console.warn("Could not persist messages to file:", err);
@@ -381,9 +212,6 @@ function persistMessagesToFile() {
 
 function loadPersistedMessages() {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
     if (fs.existsSync(MESSAGES_FILE)) {
       const content = fs.readFileSync(MESSAGES_FILE, "utf-8");
       const list: ServerMessage[] = JSON.parse(content);
@@ -392,68 +220,111 @@ function loadPersistedMessages() {
         return;
       }
     }
-    // If file doesn't exist or is empty, initialize with seeds
-    serverMessages = [...SEED_MESSAGES];
-    persistMessagesToFile();
   } catch (err) {
-    console.warn("Could not load persisted messages:", err);
-    serverMessages = [...SEED_MESSAGES];
+    console.warn("Could not load messages from file:", err);
   }
+  serverMessages = [...SEED_MESSAGES];
+  persistMessagesToFile();
 }
 
 loadPersistedMessages();
 
-// 7. GET /api/messages - List all helpdesk & complaint messages
+// GET /api/messages - Retrieve all messages
 app.get("/api/messages", (_req, res) => {
-  // Ensure sorted by createdAt descending
-  const sorted = [...serverMessages].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  return res.json({ success: true, messages: sorted });
+  res.json({ success: true, messages: serverMessages });
 });
 
-// 8. POST /api/messages - Submit a new message / complaint / ticket
+// GET /api/messages/track/:code - Student ticket lookup
+app.get("/api/messages/track/:code", (req, res) => {
+  const code = req.params.code.trim().toUpperCase();
+  const match = serverMessages.find(
+    (m) =>
+      (m.trackingCode && m.trackingCode.toUpperCase() === code) ||
+      (m.ticketId && m.ticketId.toUpperCase() === code) ||
+      (m.id && m.id.toUpperCase() === code)
+  );
+
+  if (!match) {
+    return res.status(404).json({ success: false, error: "Complaint tracking code not found." });
+  }
+
+  return res.json({
+    success: true,
+    complaint: {
+      id: match.id,
+      trackingCode: match.trackingCode || match.ticketId || match.id,
+      category: match.category || match.tag || "General Inquiry",
+      subject: match.subject || "Student Inquiry / Grievance",
+      status: match.status || "In Review",
+      createdAt: match.createdAt,
+      adminRemarks: match.adminRemarks || "Your inquiry is in the institutional queue. The FSU Executive Committee is reviewing the matter.",
+      adminRemarkUpdatedAt: match.adminRemarkUpdatedAt || match.createdAt,
+      name: match.isAnonymous ? "Anonymous Student" : match.name,
+    },
+  });
+});
+
+// POST /api/messages - Submit a new inquiry or complaint
 app.post("/api/messages", (req, res) => {
-  const body = req.body || {};
-  const randCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const trackingCode = (body.trackingCode || body.ticketId || `FSU-COMP-${randCode}`).toUpperCase();
-  const id = body.id || trackingCode;
+  const {
+    name,
+    className,
+    semester,
+    contactInfo,
+    phone,
+    email,
+    rollNumber,
+    faculty,
+    category,
+    subject,
+    message,
+    imageUrl,
+    isAnonymous,
+    tag,
+  } = req.body;
+
+  if (!message || typeof message !== "string" || !message.trim()) {
+    return res.status(400).json({ success: false, error: "Message content cannot be empty." });
+  }
+
+  const generatedNum = Math.floor(100000 + Math.random() * 900000);
+  const trackingCode = `FSU-COMP-${generatedNum}`;
+  const now = Date.now();
 
   const newMsg: ServerMessage = {
-    id,
-    name: body.name ? body.name.trim() : (body.isAnonymous ? "Anonymous Student" : "Anonymous"),
-    className: body.className || body.faculty || "N/A",
-    semester: body.semester || "N/A",
-    contactInfo: body.contactInfo || (body.phone ? body.phone : (body.isAnonymous ? "Confidential" : "Not Provided")),
-    phone: body.phone || undefined,
-    email: body.email || undefined,
-    rollNumber: body.rollNumber || undefined,
-    faculty: body.faculty || body.className || undefined,
-    category: body.category || "General Inquiry",
-    ticketId: body.ticketId || trackingCode,
+    id: trackingCode,
+    ticketId: trackingCode,
     trackingCode,
-    tag: body.tag || "FSU Helpdesk Ticket",
-    status: body.status || "Pending",
-    subject: body.subject || `Inquiry from ${body.name || "Student"}`,
-    message: body.message ? body.message.trim() : "No message provided.",
-    imageUrl: body.imageUrl || undefined,
-    isAnonymous: Boolean(body.isAnonymous),
-    createdAt: body.createdAt || Date.now(),
-    adminRemarks: body.adminRemarks || "",
-    adminRemarkUpdatedAt: body.adminRemarkUpdatedAt || undefined,
+    name: isAnonymous ? "Anonymous Student" : (name ? name.trim() : "Guest Student"),
+    className: className || undefined,
+    semester: semester || undefined,
+    contactInfo: contactInfo || undefined,
+    phone: phone || undefined,
+    email: email || undefined,
+    rollNumber: rollNumber || undefined,
+    faculty: faculty || undefined,
+    category: category || "General Helpdesk",
+    subject: subject || (category ? `[Helpdesk] ${category}` : "Student Inquiry"),
+    message: message.trim(),
+    imageUrl: imageUrl || undefined,
+    isAnonymous: !!isAnonymous,
+    tag: tag || (isAnonymous ? "Confidential Grievance" : "FSU Helpdesk Ticket"),
+    status: "Pending",
+    createdAt: now,
+    adminRemarks: "Received and registered in the FSU Helpdesk registry.",
+    adminRemarkUpdatedAt: now,
   };
 
-  // Prepend to serverMessages (or replace if existing id)
-  const existingIdx = serverMessages.findIndex((m) => m.id === newMsg.id || m.trackingCode === newMsg.trackingCode);
-  if (existingIdx >= 0) {
-    serverMessages[existingIdx] = { ...serverMessages[existingIdx], ...newMsg };
-  } else {
-    serverMessages.unshift(newMsg);
+  serverMessages.unshift(newMsg);
+  if (serverMessages.length > 500) {
+    serverMessages = serverMessages.slice(0, 500);
   }
 
   persistMessagesToFile();
   return res.status(201).json({ success: true, message: newMsg });
 });
 
-// 9. PATCH /api/messages/:id - Update status & admin remarks
+// PATCH /api/messages/:id - Update status & admin remarks
 app.patch("/api/messages/:id", (req, res) => {
   const targetId = req.params.id;
   const { status, adminRemarks } = req.body;
@@ -478,7 +349,7 @@ app.patch("/api/messages/:id", (req, res) => {
   return res.json({ success: true, message: serverMessages[msgIndex] });
 });
 
-// 10. DELETE /api/messages/:id - Delete a message
+// DELETE /api/messages/:id - Delete a message
 app.delete("/api/messages/:id", (req, res) => {
   const targetId = req.params.id;
   const initialLength = serverMessages.length;

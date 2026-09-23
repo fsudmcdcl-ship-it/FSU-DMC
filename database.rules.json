@@ -1,54 +1,62 @@
 {
   "rules": {
     ".read": true,
-    ".write": true,
+    ".write": "auth != null",
     "generalSettings": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "importantNotice": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "slides": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "news": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
+    },
+    "courses": {
+      ".read": true,
+      ".write": "auth != null"
     },
     "downloads": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "blogs": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "team": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "staff": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "professors": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "faqs": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
     "trackingSettings": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
     },
-    "admins": {
+    "portalEntries": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null"
+    },
+    "upcomingEvents": {
+      ".read": true,
+      ".write": "auth != null"
     },
     "contacts": {
       ".read": true,

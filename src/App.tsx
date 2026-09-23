@@ -22,6 +22,7 @@ import {
   getLocalNodeData,
   setLocalNodeData,
   onLocalDataChanged,
+  fetchGlobalContent,
 } from "./lib/dataService";
 
 // Core Components
@@ -258,6 +259,14 @@ export default function App() {
 
   // Sync DB and Seed if empty
   useEffect(() => {
+    // 1. Fetch live global content from server to ensure all visitor devices sync identically
+    fetchGlobalContent().then((globalData) => {
+      if (globalData) {
+        setDbState(globalData);
+        setLoading(false);
+      }
+    });
+
     const checkAndSeed = async () => {
       await seedInitialDataIfEmpty();
     };

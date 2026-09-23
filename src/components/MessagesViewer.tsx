@@ -4,7 +4,7 @@ import { rtdb } from "../lib/firebase";
 import {
   AdminUser,
   onAdminAuthStateChanged,
-  loginAdminWithCredentials,
+  signInAdminWithEmail,
   signOutAdmin,
   getCurrentAdminUser,
 } from "../lib/authService";
@@ -224,16 +224,12 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
     setAuthSuccess("");
 
     try {
-      const res = await loginAdminWithCredentials(username, password);
-      if (res.success && res.user) {
-        setUser(res.user);
-        setAuthSuccess(`Welcome, ${res.user.fullName || res.user.username}!`);
-        await fetchMessages();
-      } else {
-        setAuthError(res.error || "Authentication failed. Please verify credentials.");
-      }
+      const activeUser = await signInAdminWithEmail(username.trim(), password);
+      setUser(activeUser);
+      setAuthSuccess(`Welcome, ${activeUser.fullName || activeUser.email}!`);
+      await fetchMessages();
     } catch (err: any) {
-      setAuthError(err.message || "Failed to log in.");
+      setAuthError(err.message || "Authentication failed. Please verify credentials.");
     } finally {
       setLoginLoading(false);
     }
@@ -482,18 +478,18 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
           <form onSubmit={handleCustomLogin} className="space-y-4 text-left">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Admin Username
+                Administrator Email
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-                  <User className="w-4 h-4" />
+                  <Mail className="w-4 h-4" />
                 </span>
                 <input
-                  type="text"
+                  type="email"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter administrator username"
+                  placeholder="admin@fsudmc.com"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
                 />
               </div>
@@ -501,7 +497,7 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Admin Password
+                Password
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -540,8 +536,8 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
           </form>
 
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-left text-[11px] text-slate-600 space-y-1">
-            <span className="font-bold text-slate-800 block">🔒 Access Credentials:</span>
-            <span>Master Admin and registered Secondary Admins must authenticate with their designated username and password.</span>
+            <span className="font-bold text-slate-800 block">🔒 Firebase Authentication:</span>
+            <span>Self-registration is permanently disabled. Administrator credentials are authenticated directly via Google Firebase Auth.</span>
           </div>
 
           <button
