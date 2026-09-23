@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getNepaliDate } from "../utils/nepaliDate";
 import { GeneralSettings } from "../types";
-import { Bell, Menu, X, Clock, Calendar, ExternalLink } from "lucide-react";
+import { Menu, X, Clock, Calendar, ExternalLink } from "lucide-react";
 
 interface HeaderProps {
   settings: GeneralSettings;
@@ -130,22 +130,6 @@ export default function Header({
                 </span>
               </div>
             </div>
-
-            {/* Recent News & Notices Button */}
-            <button
-              id="btn-important-notice"
-              onClick={onOpenImportantNotice}
-              className="relative px-3.5 py-2 text-xs font-bold uppercase tracking-wider rounded-xl text-white bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 active:scale-95 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer border border-red-600/60"
-              title="Click to view recent news and notices"
-            >
-              <Bell className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
-              <span>Notices !</span>
-              {newsCount > 0 && (
-                <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-1.5 py-0.2 rounded-full font-mono shadow-xs ml-0.5">
-                  {newsCount}
-                </span>
-              )}
-            </button>
           </div>
         </div>
       </div>
@@ -169,12 +153,7 @@ export default function Header({
                   href={item.slug}
                   onClick={(e) => {
                     e.preventDefault();
-                    if (item.id === "notices") {
-                      // Also open structured recent notices or navigate
-                      onNavClick(item.id);
-                    } else {
-                      onNavClick(item.id);
-                    }
+                    onNavClick(item.id);
                   }}
                   className={`h-12 px-3.5 flex items-center text-xs font-bold uppercase tracking-wider transition-all relative cursor-pointer ${
                     isActive
@@ -183,32 +162,12 @@ export default function Header({
                   }`}
                 >
                   <span>{item.label}</span>
-                  {item.id === "notices" && newsCount > 0 && (
-                    <span className="ml-1.5 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full font-mono">
-                      {newsCount}
-                    </span>
-                  )}
                   {isActive && (
                     <span className="absolute bottom-0 left-0 right-0 h-1 bg-amber-400" />
                   )}
                 </a>
               );
             })}
-
-            {isScrolled && (
-              <button
-                onClick={onOpenImportantNotice}
-                className="ml-3 px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition shadow-sm cursor-pointer"
-              >
-                <Bell className="w-3 h-3 text-amber-300 animate-pulse" />
-                <span>Recent Notices</span>
-                {newsCount > 0 && (
-                  <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-1.5 py-0.2 rounded-full font-mono">
-                    {newsCount}
-                  </span>
-                )}
-              </button>
-            )}
           </div>
 
           {/* Right side info / domain */}
@@ -225,18 +184,6 @@ export default function Header({
             </span>
             <div className="flex items-center gap-2">
               <button
-                onClick={onOpenImportantNotice}
-                className="px-2.5 py-1 rounded-lg bg-red-700 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-              >
-                <Bell className="w-3 h-3 text-amber-300 animate-pulse" />
-                <span>Notices</span>
-                {newsCount > 0 && (
-                  <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-1 py-0.2 rounded-full font-mono">
-                    {newsCount}
-                  </span>
-                )}
-              </button>
-              <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-blue-900 transition cursor-pointer"
                 aria-label="Toggle navigation menu"
@@ -250,23 +197,6 @@ export default function Header({
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-blue-900 border-t border-blue-800 px-3 pt-2 pb-4 space-y-2">
-            {/* Quick Recent Notices button in mobile menu */}
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenImportantNotice();
-              }}
-              className="w-full text-left p-2.5 rounded-xl bg-gradient-to-r from-red-700 to-red-800 text-white flex items-center justify-between text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer"
-            >
-              <span className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-amber-300 animate-pulse" />
-                <span>View Recent News & Notices</span>
-              </span>
-              <span className="bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-mono text-[10px] font-black">
-                {newsCount} Updates
-              </span>
-            </button>
-
             {menuItems.map((item) => {
               const isActive = activeSection === item.id;
               return (
