@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { NewsItem, GeneralSettings } from "../types";
+import ExpandableText from "./ExpandableText";
 import {
   Calendar,
   FileText,
@@ -11,6 +12,7 @@ import {
   Award,
   Facebook,
   ExternalLink,
+  ImageIcon,
 } from "lucide-react";
 
 interface NewsSectionProps {
@@ -223,25 +225,48 @@ export default function NewsSection({
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              {selectedNews.imageUrl && (
-                <img
-                  src={selectedNews.imageUrl}
-                  alt={selectedNews.headingEn}
-                  className="w-full max-h-80 object-cover rounded-2xl shadow-sm border border-slate-100"
-                  referrerPolicy="no-referrer"
-                />
+            <div className="p-6 overflow-y-auto flex-1 space-y-5">
+              {/* Attached Images Gallery - Natural Aspect Ratio */}
+              {((selectedNews.images && selectedNews.images.length > 0) || selectedNews.imageUrl) && (
+                <div className="space-y-3">
+                  {(selectedNews.images && selectedNews.images.length > 0
+                    ? selectedNews.images
+                    : [selectedNews.imageUrl!]
+                  ).map((imgUrl, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-slate-50 border border-slate-200/80 rounded-2xl p-2 flex items-center justify-center overflow-hidden"
+                    >
+                      <img
+                        src={imgUrl}
+                        alt={`${selectedNews.headingEn} - Image ${idx + 1}`}
+                        className="max-h-[500px] w-auto max-w-full object-contain rounded-xl shadow-xs"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
-              <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
-                <Calendar className="w-3.5 h-3.5" />
-                {new Date(selectedNews.createdAt).toLocaleString()}
-              </span>
+
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
+                  <Calendar className="w-3.5 h-3.5 text-blue-900" />
+                  {new Date(selectedNews.createdAt).toLocaleString()}
+                </span>
+                {selectedNews.images && selectedNews.images.length > 1 && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-900 border border-blue-200 px-2 py-0.5 rounded-full font-mono">
+                    {selectedNews.images.length} Attached Images
+                  </span>
+                )}
+              </div>
+
               <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 leading-tight">
                 {selectedNews.headingEn}
               </h3>
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50 p-5 rounded-2xl border border-slate-100/60 font-sans">
-                {selectedNews.bodyEn}
-              </p>
+
+              <div className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-100/80 font-sans">
+                <ExpandableText text={selectedNews.bodyEn} maxLines={11} />
+              </div>
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">

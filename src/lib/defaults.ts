@@ -320,5 +320,72 @@ export const DEFAULT_DB_STATE: DatabaseState = {
       officeHours: "Mon, Wed, Fri: 10:00 AM – 12:00 PM",
       imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400",
     }
+  },
+  courses: {
+    "course-bbs": {
+      id: "course-bbs",
+      titleEn: "Bachelor of Business Studies (BBS)",
+      titleNp: "व्यवसाय अध्ययनमा स्नातक (BBS)",
+      level: "Bachelor's Degree",
+      faculty: "Faculty of Management",
+      duration: "4 Years (Annual System)",
+      descriptionEn: "The Bachelor of Business Studies (BBS) program under Farwestern University equips students with essential conceptual and practical knowledge in business management, accounting, banking, marketing, and entrepreneurship. The program emphasizes analytical thinking, ethical business leadership, and hands-on case studies relevant to the Nepalese economy.",
+      eligibilityEn: "Completed +2 or equivalent in any discipline with minimum D+ / 45% aggregate score recognized by FWU.",
+      careerProspects: "Banking & Financial Institutions, Corporate Enterprises, Accounting Firms, Civil Service, and Independent Business Entrepreneurship.",
+      imageUrl: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=800",
+      order: 1
+    },
+    "course-bed": {
+      id: "course-bed",
+      titleEn: "Bachelor of Education (B.Ed)",
+      titleNp: "शिक्षाशास्त्रमा स्नातक (B.Ed)",
+      level: "Bachelor's Degree",
+      faculty: "Faculty of Education",
+      duration: "4 Years (Annual System)",
+      descriptionEn: "The 4-Year Bachelor of Education (B.Ed) program prepares professional, competent, and innovative educators across diverse specializations including Nepali, English, Health & Physical Education, and Social Studies. Emphasizes modern pedagogy, classroom management, and practical teaching practicum in community schools.",
+      eligibilityEn: "Completed +2 or Higher Secondary Education in Education or any recognized stream.",
+      careerProspects: "Secondary School Teachers, Educational Administrators, Curriculum Planners, NGO/INGO Educational Officers, and Researchers.",
+      imageUrl: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&q=80&w=800",
+      order: 2
+    },
+    "course-ba": {
+      id: "course-ba",
+      titleEn: "Bachelor of Arts (BA)",
+      titleNp: "मानविकीमा स्नातक (BA)",
+      level: "Bachelor's Degree",
+      faculty: "Faculty of Humanities & Social Sciences",
+      duration: "4 Years (Annual System)",
+      descriptionEn: "A comprehensive multidisciplinary undergraduate program designed to cultivate critical thinking, socio-cultural understanding, and linguistic fluency. Major subject combinations include Sociology, English Literature, Nepali Literature, Economics, and Rural Development.",
+      eligibilityEn: "Completed 10+2 / Intermediate level in any discipline.",
+      careerProspects: "Public Administration, Journalism & Media, Social Research, Non-Governmental Organizations (NGOs), and Public Relations.",
+      imageUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=800",
+      order: 3
+    },
+    "course-mbs": {
+      id: "course-mbs",
+      titleEn: "Master of Business Studies (MBS)",
+      titleNp: "व्यवसाय अध्ययनमा स्नातकोत्तर (MBS)",
+      level: "Master's Degree (Postgraduate)",
+      faculty: "Faculty of Management",
+      duration: "2 Years (Semester System)",
+      descriptionEn: "The Master of Business Studies (MBS) is a rigorous postgraduate degree aimed at developing high-caliber managerial professionals, business strategists, and researchers. Focuses on advanced finance, strategic management, research methodology, and organizational behavior.",
+      eligibilityEn: "Bachelor's Degree in Business Studies (BBS), BBA, or equivalent from FWU or recognized universities.",
+      careerProspects: "Senior Corporate Executives, Bank Managers, Financial Analysts, College Lecturers, and Policy Consultants.",
+      imageUrl: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&q=80&w=800",
+      order: 4
+    },
+    "course-med": {
+      id: "course-med",
+      titleEn: "Master of Education (M.Ed)",
+      titleNp: "शिक्षाशास्त्रमा स्नातकोत्तर (M.Ed)",
+      level: "Master's Degree (Postgraduate)",
+      faculty: "Faculty of Education",
+      duration: "2 Years (Semester System)",
+      descriptionEn: "Advanced postgraduate specialization for visionary educators, educational researchers, and pedagogical leaders. Offers advanced focus on Educational Planning, Curriculum Development, and Specialized Subject Methodologies.",
+      eligibilityEn: "Bachelor of Education (B.Ed) or One-Year B.Ed from any recognized university.",
+      careerProspects: "Higher Secondary & University Faculty, Education Policy Specialists, Campus Administrators, and INGO Project Directors.",
+      imageUrl: "https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=800",
+      order: 5
+    }
   }
 };

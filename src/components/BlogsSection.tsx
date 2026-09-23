@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BlogItem } from "../types";
+import ExpandableText from "./ExpandableText";
 import { Calendar, User, Share2, Eye, X, Check } from "lucide-react";
 
 interface BlogsSectionProps {
@@ -194,8 +195,8 @@ export default function BlogsSection({
                 </div>
               </div>
 
-              <div className="text-sm md:text-base text-slate-700 leading-relaxed font-sans whitespace-pre-line">
-                {selectedBlog.bodyEn}
+              <div className="text-sm md:text-base text-slate-700 leading-relaxed font-sans">
+                <ExpandableText text={selectedBlog.bodyEn} maxLines={11} />
               </div>
             </div>
 

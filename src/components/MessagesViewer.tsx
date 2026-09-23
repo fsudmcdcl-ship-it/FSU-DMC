@@ -9,6 +9,7 @@ import {
   getCurrentAdminUser,
 } from "../lib/authService";
 import { ContactSubmission } from "../types";
+import ExpandableText from "./ExpandableText";
 import {
   Lock,
   MailOpen,
@@ -36,6 +37,10 @@ import {
   ExternalLink,
   X,
   Sparkles,
+  GraduationCap,
+  BookOpen,
+  Clock,
+  FileText,
 } from "lucide-react";
 
 interface MessagesViewerProps {
@@ -259,7 +264,7 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="e.g. dmcadmin"
+                  placeholder="Enter authorized admin username"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
                 />
               </div>
@@ -420,7 +425,7 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
           </p>
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           {filteredMessages.map((item) => {
             const trackingId = item.trackingCode || item.ticketId || item.id;
             const currentStatus = statusDrafts[item.id] || item.status || "Pending";
@@ -428,22 +433,46 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
             const isSaving = savingId === item.id;
             const isSuccess = savedSuccessId === item.id;
 
+            const studentName = item.name || (item.isAnonymous ? "Anonymous Student" : "Not Provided");
+            const classFaculty = (item as any).faculty || item.className || "Not Specified";
+            const yearSemester = item.semester || (item as any).year || "Not Specified";
+            const phone = (item as any).phone || (item.contactInfo && item.contactInfo !== "Confidential" ? item.contactInfo : "Not Provided");
+            const email = (item as any).email || "Not Provided";
+            const attachmentUrl = item.imageUrl || (item as any).fileUrl || (item as any).attachmentUrl;
+
+            // Status badge color
+            const getStatusBadge = (st: string) => {
+              const lower = st.toLowerCase();
+              if (lower.includes("resolved") || lower.includes("closed")) {
+                return "bg-emerald-50 text-emerald-700 border-emerald-200";
+              }
+              if (lower.includes("reject")) {
+                return "bg-red-50 text-red-700 border-red-200";
+              }
+              if (lower.includes("progress")) {
+                return "bg-blue-50 text-blue-800 border-blue-200";
+              }
+              if (lower.includes("review")) {
+                return "bg-purple-50 text-purple-800 border-purple-200";
+              }
+              return "bg-amber-50 text-amber-800 border-amber-200";
+            };
+
             return (
               <div
                 key={item.id}
-                className="bg-white rounded-3xl border border-slate-200 shadow-xs hover:shadow-md transition-shadow p-6 sm:p-7 space-y-5"
+                className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden"
               >
-                {/* Header row: Tracking Code, Student, Date, Delete */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* Unique Tracking Code */}
-                    <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 px-3 py-1 rounded-xl">
-                      <span className="text-[10px] font-bold text-blue-900 uppercase">Tracking ID:</span>
+                {/* Card Top: Tracking ID, Status, Date, Delete */}
+                <div className="bg-slate-50/80 px-6 py-4 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">ID:</span>
                       <span className="font-mono font-black text-xs text-blue-950">{trackingId}</span>
                       <button
                         type="button"
                         onClick={() => handleCopy(trackingId, item.id)}
-                        className="text-blue-700 hover:text-blue-950 cursor-pointer p-0.5"
+                        className="text-slate-400 hover:text-blue-900 cursor-pointer p-0.5"
                         title="Copy tracking code"
                       >
                         {copiedId === item.id ? (
@@ -454,65 +483,26 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
                       </button>
                     </div>
 
-                    {item.isAnonymous ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
-                        Anonymous Student
-                      </span>
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">
-                          {item.name || "Student"}
-                        </span>
-                        {((item as any).rollNumber || (item as any).roll) && (
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-mono font-bold border border-slate-200">
-                            Roll: {(item as any).rollNumber || (item as any).roll}
-                          </span>
-                        )}
-                        {(item.className || (item as any).faculty) && (
-                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-900 text-[10px] font-medium border border-blue-100">
-                            {(item as any).faculty || item.className}
-                          </span>
-                        )}
-                        {item.semester && (
-                          <span className="text-[11px] text-slate-500 font-medium">
-                            • {item.semester}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Contact Phone & Email */}
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600 font-mono">
-                      {((item as any).phone || (item.contactInfo && item.contactInfo !== "Confidential")) && (
-                        <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          <span>{(item as any).phone || item.contactInfo}</span>
-                        </span>
-                      )}
-                      {(item as any).email && (
-                        <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
-                          <Mail className="w-3 h-3 text-slate-400" />
-                          <span>{(item as any).email}</span>
-                        </span>
-                      )}
-                      {(item.category || (item as any).tag) && (
-                        <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 text-[10px] font-bold border border-amber-200">
-                          {item.category || (item as any).tag}
-                        </span>
-                      )}
-                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider border ${getStatusBadge(
+                        currentStatus
+                      )}`}
+                    >
+                      {currentStatus}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      {new Date(item.createdAt || Date.now()).toLocaleString()}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-slate-400" />
+                      <span>{new Date(item.createdAt || Date.now()).toLocaleDateString()}</span>
                     </span>
                     {user.role !== "reviewer" && (
                       <button
                         type="button"
                         onClick={() => handleDelete(item.id)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
-                        title="Delete record (Master/Secondary Admin only)"
+                        title="Delete record"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -520,118 +510,201 @@ export default function MessagesViewer({ onGoHome }: MessagesViewerProps) {
                   </div>
                 </div>
 
-                {/* Message Body & Image Attachment - Fully expanded, no truncation */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2 space-y-3">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                      Student Grievance / Inquiry Details (Complete Text)
-                    </span>
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed break-words">
-                      {item.message}
+                {/* Card Body */}
+                <div className="p-6 space-y-5 flex-1">
+                  {/* Detailed Fields Grid: Name, Class/Faculty, Year/Semester, Phone, Email */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-slate-50/60 rounded-2xl border border-slate-200/70 text-xs">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                        Name
+                      </span>
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-blue-900 shrink-0" />
+                        <span>{studentName}</span>
+                      </span>
                     </div>
 
-                    {/* Image Attachment (Requirement #3) */}
-                    {item.imageUrl && (
-                      <div className="flex items-center gap-3 p-2.5 bg-slate-100/70 rounded-2xl border border-slate-200 w-fit">
-                        <img
-                          src={item.imageUrl}
-                          alt="Attachment"
-                          className="w-14 h-14 object-cover rounded-xl cursor-pointer hover:opacity-90"
-                          onClick={() => setPreviewImage(item.imageUrl!)}
-                        />
-                        <div className="space-y-0.5 pr-2">
-                          <span className="text-xs font-bold text-slate-800 block">
-                            Attached Photo Evidence
-                          </span>
-                          <button
-                            type="button"
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                        Class / Faculty
+                      </span>
+                      <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-blue-900 shrink-0" />
+                        <span>{classFaculty}</span>
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                        Year / Semester
+                      </span>
+                      <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-blue-900 shrink-0" />
+                        <span>{yearSemester}</span>
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                        Phone Number
+                      </span>
+                      <span className="font-mono text-slate-800 flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-blue-900 shrink-0" />
+                        <span>{phone}</span>
+                      </span>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                        Email Address
+                      </span>
+                      <span className="font-mono text-slate-800 flex items-center gap-1.5 break-all">
+                        <Mail className="w-3.5 h-3.5 text-blue-900 shrink-0" />
+                        <span>{email}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Message Field with 11-line auto-trimming via ExpandableText */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <MessageSquare className="w-3 h-3 text-slate-400" />
+                      <span>Message / Grievance</span>
+                    </span>
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200 text-xs sm:text-sm text-slate-800 leading-relaxed shadow-2xs">
+                      <ExpandableText text={item.message} maxLines={11} />
+                    </div>
+                  </div>
+
+                  {/* Attachment link/preview */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <FileText className="w-3 h-3 text-slate-400" />
+                      <span>Attachment / Document</span>
+                    </span>
+                    {attachmentUrl ? (
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt="Student Attachment"
+                            className="w-14 h-14 object-cover rounded-xl cursor-pointer hover:opacity-90 border border-slate-200 shrink-0"
                             onClick={() => setPreviewImage(item.imageUrl!)}
-                            className="text-[11px] text-blue-900 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                            View Full Resolution
-                          </button>
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-blue-100 text-blue-900 rounded-xl flex items-center justify-center shrink-0">
+                            <FileText className="w-6 h-6" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-bold text-slate-800 block truncate">
+                            Attached File / Evidence
+                          </span>
+                          <div className="flex items-center gap-3 mt-1">
+                            {item.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewImage(item.imageUrl!)}
+                                className="text-[11px] font-bold text-blue-900 hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Preview</span>
+                              </button>
+                            )}
+                            <a
+                              href={attachmentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] font-bold text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              <span>Open in New Tab</span>
+                            </a>
+                          </div>
                         </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs italic">
+                        No attachment uploaded for this message.
                       </div>
                     )}
                   </div>
+                </div>
 
-                  {/* Status & Admin Remarks Box (Requirement #3 & #4) */}
-                  <div className="bg-blue-50/60 rounded-2xl border border-blue-200/80 p-4 space-y-3 flex flex-col justify-between">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold uppercase tracking-wider text-blue-950 flex items-center gap-1.5">
-                          <MessageSquare className="w-3.5 h-3.5 text-blue-900" />
-                          <span>Condition & Remarks</span>
-                        </label>
-                      </div>
+                {/* Card Footer: Interactive Admin Remarks & Status */}
+                <div className="bg-blue-50/50 p-6 border-t border-blue-100/80 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-blue-950 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-blue-900" />
+                      <span>Admin Status & Internal Remarks</span>
+                    </label>
+                  </div>
 
-                      {/* Condition / Status Selector */}
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                          Current Status:
-                        </span>
-                        <select
-                          value={currentStatus}
-                          onChange={(e) =>
-                            setStatusDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))
-                          }
-                          className="w-full px-3 py-1.5 rounded-xl border border-blue-200 text-xs font-bold bg-white text-slate-800 focus:ring-2 focus:ring-blue-900 focus:outline-none"
-                        >
-                          <option value="Pending">Pending Review</option>
-                          <option value="In Review">In Review by Secretariat</option>
-                          <option value="In Progress">In Progress / Committee Action</option>
-                          <option value="Resolved">Resolved & Closed</option>
-                          <option value="Rejected">Rejected / Ineligible</option>
-                        </select>
-                      </div>
-
-                      {/* Admin Remarks Input */}
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                          FSU Remarks (Visible to Student on Tracker):
-                        </span>
-                        <textarea
-                          rows={3}
-                          value={currentRemarks}
-                          onChange={(e) =>
-                            setRemarksDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))
-                          }
-                          placeholder="Add official resolution notes, committee decision, or instructions for the student..."
-                          className="w-full px-3 py-2 rounded-xl border border-blue-200 text-xs bg-white text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-900 focus:outline-none"
-                        />
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                        Status
+                      </span>
+                      <select
+                        value={currentStatus}
+                        onChange={(e) =>
+                          setStatusDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 rounded-xl border border-blue-200 text-xs font-bold bg-white text-slate-800 focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                      >
+                        <option value="Pending">Pending Review</option>
+                        <option value="In Review">In Review</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
                     </div>
 
-                    {/* Save Button */}
-                    <div className="pt-2 flex items-center justify-between gap-2">
+                    <div className="sm:col-span-2">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                        Admin Remarks Field (Editable)
+                      </span>
+                      <textarea
+                        rows={2}
+                        value={currentRemarks}
+                        onChange={(e) =>
+                          setRemarksDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        }
+                        placeholder="Write admin internal remarks, resolution updates, or notes..."
+                        className="w-full px-3 py-2 rounded-xl border border-blue-200 text-xs bg-white text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
                       {isSuccess ? (
                         <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          Updated!
+                          Remarks & Status Saved!
                         </span>
                       ) : (
                         <span className="text-[10px] text-slate-400">
                           {item.adminRemarkUpdatedAt
-                            ? `Updated ${new Date(item.adminRemarkUpdatedAt).toLocaleDateString()}`
-                            : "No remarks yet"}
+                            ? `Last updated: ${new Date(item.adminRemarkUpdatedAt).toLocaleDateString()}`
+                            : "No remarks saved yet"}
                         </span>
                       )}
-
-                      <button
-                        type="button"
-                        disabled={isSaving}
-                        onClick={() => handleSaveRemarksAndStatus(item)}
-                        className="px-3.5 py-1.5 rounded-xl bg-blue-950 hover:bg-blue-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
-                      >
-                        {isSaving ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Save className="w-3.5 h-3.5 text-amber-400" />
-                        )}
-                        <span>Save Updates</span>
-                      </button>
                     </div>
+
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => handleSaveRemarksAndStatus(item)}
+                      className="px-4 py-2 rounded-xl bg-blue-950 hover:bg-blue-900 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Save className="w-3.5 h-3.5 text-amber-400" />
+                      )}
+                      <span>Save Remarks</span>
+                    </button>
                   </div>
                 </div>
               </div>

@@ -44,11 +44,27 @@ export interface SlideItem {
 export interface NewsItem {
   id: string;
   headingEn: string;
-  headingNp: string;
+  headingNp?: string;
   bodyEn: string;
-  bodyNp: string;
+  bodyNp?: string;
   imageUrl?: string;
+  images?: string[]; // Multiple images for notice
   createdAt: number;
+}
+
+export interface CourseItem {
+  id: string;
+  titleEn: string;
+  titleNp?: string;
+  level?: string; // e.g. "Bachelor's Degree", "Master's Degree", "+2"
+  faculty?: string; // e.g. "Management", "Education", "Humanities"
+  duration?: string; // e.g. "4 Years (8 Semesters)"
+  descriptionEn: string;
+  descriptionNp?: string;
+  eligibilityEn?: string;
+  careerProspects?: string;
+  imageUrl?: string;
+  order?: number;
 }
 
 export interface DownloadItem {
@@ -186,6 +202,7 @@ export interface DatabaseState {
   staff?: Record<string, StaffItem>;
   professors?: Record<string, ProfessorItem>;
   faqs?: Record<string, FaqItem>;
+  courses?: Record<string, CourseItem>;
   trackingSettings?: ComplaintTrackingSettings;
   admins?: Record<string, SystemAdmin>;
 }

@@ -77,6 +77,26 @@ export default function Footer({ onNavigate, onOpenTracker }: FooterProps) {
           <ul className="space-y-2 text-xs">
             <li>
               <a
+                href="/notices"
+                onClick={(e) => handleNav("notices", e)}
+                className="hover:text-amber-400 transition flex items-center gap-2"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                <span>Official Notices & Circulars</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href="/courses"
+                onClick={(e) => handleNav("courses", e)}
+                className="hover:text-amber-400 transition flex items-center gap-2"
+              >
+                <GraduationCap className="w-3.5 h-3.5 text-amber-500" />
+                <span>Offered Academic Courses</span>
+              </a>
+            </li>
+            <li>
+              <a
                 href="/campus-staff"
                 onClick={(e) => handleNav("campus-staff", e)}
                 className="hover:text-amber-400 transition flex items-center gap-2"

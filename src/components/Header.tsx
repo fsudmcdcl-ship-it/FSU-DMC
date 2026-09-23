@@ -46,6 +46,8 @@ export default function Header({
   const menuItems = [
     { id: "home", label: "HOME", slug: "/home" },
     { id: "about", label: "ABOUT", slug: "/about" },
+    { id: "notices", label: "NOTICES", slug: "/notices" },
+    { id: "courses", label: "COURSES", slug: "/courses" },
     { id: "syllabus-notes", label: "SYLLABUS/NOTES", slug: "/syllabus-notes" },
     { id: "fsu-team", label: "FSU TEAM", slug: "/fsu-team" },
     { id: "student-blogs", label: "STUDENT BLOGS", slug: "/student-blogs" },
@@ -75,7 +77,7 @@ export default function Header({
                 id="header-logo"
                 src={settings?.logoUrl || "/logo.png"}
                 alt="Free Student Union - DMC Logo"
-                className="w-14 h-14 object-cover rounded-full shadow-md border-2 border-red-700 ring-2 ring-red-50 group-hover:scale-105 transition-transform"
+                className="h-14 sm:h-16 md:h-20 w-auto max-w-[180px] md:max-w-[220px] object-contain drop-shadow-sm group-hover:scale-105 transition-transform shrink-0"
                 referrerPolicy="no-referrer"
               />
             </button>

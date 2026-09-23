@@ -38,9 +38,13 @@ import ComplaintTracker from "./components/ComplaintTracker";
 import PopupNotice from "./components/PopupNotice";
 import CMSPanel from "./components/CMSPanel";
 import MessagesViewer from "./components/MessagesViewer";
+import CoursesCarousel from "./components/CoursesCarousel";
+import CourseDetailModal from "./components/CourseDetailModal";
 
 // Page Views
 import AboutPage from "./pages/AboutPage";
+import NoticesPage from "./pages/NoticesPage";
+import CoursesPage from "./pages/CoursesPage";
 import SyllabusPage from "./pages/SyllabusPage";
 import TeamPage from "./pages/TeamPage";
 import BlogsPage from "./pages/BlogsPage";
@@ -52,12 +56,15 @@ import SecretariatPage from "./pages/SecretariatPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsPage from "./pages/TermsPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import { CourseItem } from "./types";
 
 import { ArrowDown, Facebook, GraduationCap, ShieldCheck, ExternalLink, Search } from "lucide-react";
 
 export type RouteType =
   | "home"
   | "about"
+  | "notices"
+  | "courses"
   | "syllabus-notes"
   | "fsu-team"
   | "student-blogs"
@@ -85,6 +92,7 @@ export default function App() {
   const [forceNoticeTrigger, setForceNoticeTrigger] = useState(0);
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
   const [selectedBlogId, setSelectedBlogId] = useState<string | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<CourseItem | null>(null);
   const [showTrackerModal, setShowTrackerModal] = useState(false);
 
   // Router parsing logic
@@ -102,6 +110,8 @@ export default function App() {
       if (pageParam === "campuslogin") return { route: "campuslogin" };
       if (pageParam === "messages" || pageParam === "databasemessage2083") return { route: "databasemessage2083" };
       if (pageParam === "about") return { route: "about" };
+      if (pageParam === "notices" || pageParam === "news") return { route: "notices" };
+      if (pageParam === "courses" || pageParam === "programs") return { route: "courses" };
       if (pageParam === "syllabus-notes") return { route: "syllabus-notes" };
       if (pageParam === "fsu-team") return { route: "fsu-team" };
       if (pageParam === "student-blogs") return { route: "student-blogs" };
@@ -123,6 +133,8 @@ export default function App() {
       if (hash === "#messages" || hash === "#/messages" || hash === "#databasemessage2083" || hash === "#/databasemessage2083")
         return { route: "databasemessage2083" };
       if (hash === "#about" || hash === "#/about") return { route: "about" };
+      if (hash === "#notices" || hash === "#/notices" || hash === "#news" || hash === "#/news") return { route: "notices" };
+      if (hash === "#courses" || hash === "#/courses" || hash === "#programs" || hash === "#/programs") return { route: "courses" };
       if (hash === "#syllabus-notes" || hash === "#/syllabus-notes") return { route: "syllabus-notes" };
       if (hash === "#fsu-team" || hash === "#/fsu-team") return { route: "fsu-team" };
       if (hash === "#student-blogs" || hash === "#/student-blogs") return { route: "student-blogs" };
@@ -151,6 +163,8 @@ export default function App() {
     if (path.endsWith("/campuslogin")) return { route: "campuslogin" };
     if (path.endsWith("/messages") || path.endsWith("/databasemessage2083")) return { route: "databasemessage2083" };
     if (path.endsWith("/about")) return { route: "about" };
+    if (path.endsWith("/notices") || path.endsWith("/news")) return { route: "notices" };
+    if (path.endsWith("/courses") || path.endsWith("/programs")) return { route: "courses" };
     if (path.endsWith("/syllabus-notes")) return { route: "syllabus-notes" };
     if (path.endsWith("/fsu-team")) return { route: "fsu-team" };
     if (path.endsWith("/student-blogs")) return { route: "student-blogs" };
@@ -244,6 +258,7 @@ export default function App() {
       "importantNotice",
       "slides",
       "news",
+      "courses",
       "downloads",
       "blogs",
       "team",
@@ -307,6 +322,7 @@ export default function App() {
   const news: NewsItem[] = dbState?.news ? Object.values(dbState.news) : [];
   const downloads: DownloadItem[] = dbState?.downloads ? Object.values(dbState.downloads) : [];
   const blogs: BlogItem[] = dbState?.blogs ? Object.values(dbState.blogs) : [];
+  const courses: CourseItem[] = dbState?.courses ? Object.values(dbState.courses) : [];
   const team: TeamMember[] = dbState?.team ? Object.values(dbState.team) : [];
   const staff: StaffItem[] | undefined = dbState?.staff ? (Object.values(dbState.staff) as StaffItem[]) : undefined;
   const professors: ProfessorItem[] | undefined = dbState?.professors ? (Object.values(dbState.professors) as ProfessorItem[]) : undefined;
@@ -474,6 +490,17 @@ export default function App() {
               />
             </section>
 
+            {/* ACADEMIC COURSES SLIDING CAROUSEL */}
+            {courses.length > 0 && (
+              <section id="academic-courses" className="border-t border-slate-100 pt-16">
+                <CoursesCarousel
+                  courses={courses}
+                  onSelectCourse={(course) => setSelectedCourse(course)}
+                  onNavigateToCourses={() => navigateTo("courses")}
+                />
+              </section>
+            )}
+
             {/* MESSAGES SECTION */}
             <section id="messages-deck" className="border-t border-slate-100 pt-16">
               <MessagesSection settings={settings} president={president} />
@@ -569,6 +596,20 @@ export default function App() {
 
         {/* INDIVIDUAL SUB-PAGES */}
         {currentRoute === "about" && <AboutPage settings={settings} president={president} />}
+        {currentRoute === "notices" && (
+          <NoticesPage
+            news={news}
+            settings={settings}
+            selectedNewsId={selectedNewsId}
+            setSelectedNewsId={setSelectedNewsId}
+          />
+        )}
+        {currentRoute === "courses" && (
+          <CoursesPage
+            courses={courses}
+            onSelectCourse={(c) => setSelectedCourse(c)}
+          />
+        )}
         {currentRoute === "syllabus-notes" && <SyllabusPage downloads={downloads} />}
         {currentRoute === "fsu-team" && <TeamPage team={team} />}
         {currentRoute === "student-blogs" && (
@@ -629,6 +670,14 @@ export default function App() {
             setShowTrackerModal(false);
             navigateTo("home");
           }}
+        />
+      )}
+
+      {/* Global Course Details Modal */}
+      {selectedCourse && (
+        <CourseDetailModal
+          course={selectedCourse}
+          onClose={() => setSelectedCourse(null)}
         />
       )}
     </div>
