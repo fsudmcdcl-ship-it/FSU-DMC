@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { ref, push, set } from "firebase/database";
-import { rtdb } from "../lib/firebase";
+import { submitHelpdeskMessage } from "../lib/dataService";
 import {
   Building2,
   Mail,
@@ -40,18 +39,15 @@ export default function SecretariatPage() {
     setErrorMsg("");
 
     try {
-      const contactsRef = ref(rtdb, "contacts");
-      const newRef = push(contactsRef);
-
-      await set(newRef, {
-        id: newRef.key,
+      await submitHelpdeskMessage({
         name: visitorName.trim(),
-        organization: organization.trim() || "Independent Student / Stakeholder",
+        className: organization.trim() || "Independent Student / Stakeholder",
         phone: phone.trim(),
+        contactInfo: phone.trim(),
         email: email.trim() || "N/A",
-        meetingPurpose,
-        preferredDate: preferredDate || "Earliest Available",
-        message: `[Secretariat Meeting Request] ${meetingPurpose}: ${details.trim()}`,
+        subject: `[Secretariat Meeting Request] ${meetingPurpose}`,
+        category: "Secretariat Appointment",
+        message: `[Secretariat Meeting Request] ${meetingPurpose} (Preferred Date: ${preferredDate || "Earliest Available"}): ${details.trim()}`,
         tag: "Secretariat Appointment",
         createdAt: Date.now(),
         status: "Pending Review",

@@ -104,7 +104,8 @@ type CMSTab =
   | "admins";
 
 export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProps) {
-  const [user, setUser] = useState<AdminUser | null>(getCurrentAdminUser());
+  // Always start in logged-out state so username and password are required every time
+  const [user, setUser] = useState<AdminUser | null>(null);
   const [activeTab, setActiveTab] = useState<CMSTab>("general");
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
@@ -234,13 +235,18 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const [profFacultyFilter, setProfFacultyFilter] = useState("all");
 
   useEffect(() => {
-    const unsubscribe = onAdminAuthStateChanged((currUser) => {
-      setUser(currUser);
-      if (currUser) {
-        setAuthError("");
-      }
-    });
-    return () => unsubscribe();
+    // Require username and password entry every time user visits or opens the CMS panel
+    setUser(null);
+    signOutAdmin();
+    setUsername("");
+    setPassword("");
+    setAuthError("");
+    setAuthSuccess("");
+
+    return () => {
+      // Clear active session when navigating away from the CMS panel
+      signOutAdmin();
+    };
   }, []);
 
   useEffect(() => {
@@ -256,7 +262,20 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const handleSignOut = async () => {
     await signOutAdmin();
     setUser(null);
+    setUsername("");
+    setPassword("");
     setAuthError("");
+    setAuthSuccess("");
+  };
+
+  const handleExitToHome = () => {
+    signOutAdmin();
+    setUser(null);
+    setUsername("");
+    setPassword("");
+    setAuthError("");
+    setAuthSuccess("");
+    onGoHome();
   };
 
   const handleCredentialsLogin = async (e: React.FormEvent) => {
@@ -275,6 +294,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
       if (res.success && res.user) {
         setUser(res.user);
         setAuthError("");
+        setPassword(""); // Clear sensitive password from memory
         showToast(`Welcome back, ${res.user.fullName || res.user.username}!`);
       } else {
         setAuthError(res.error || "Authentication failed. Invalid username or password.");
@@ -980,9 +1000,15 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             </button>
           </form>
 
-          <div className="w-full space-y-3 mt-6">
+          <div className="w-full mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <span className="text-[11px] text-slate-500 font-medium">
+              🔒 <strong>Strict Authentication:</strong> Master and Secondary Admins must enter their username and password every time to access the CMS panel.
+            </span>
+          </div>
+
+          <div className="w-full space-y-3 mt-4">
             <button
-              onClick={onGoHome}
+              onClick={handleExitToHome}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
             >
               ← Back to Main Public Page
@@ -1021,7 +1047,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               <span>Go to Messages Workstation</span>
             </a>
             <button
-              onClick={onGoHome}
+              onClick={handleExitToHome}
               className="w-full py-2 text-slate-500 hover:text-slate-900 text-xs font-bold transition cursor-pointer"
             >
               ← Return to Public Website
@@ -1098,7 +1124,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           </button>
 
           <button
-            onClick={onGoHome}
+            onClick={handleExitToHome}
             className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition"
           >
             Public Site
@@ -1106,7 +1132,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
 
           <button
             onClick={handleSignOut}
-            className="p-2.5 bg-red-700 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
+            className="p-2.5 bg-red-700 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
             title="Sign Out"
           >
             <LogOut className="w-4 h-4" />

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "admin_master",
+    "username": "dmcadmin",
+    "passwordHash": "173190d539938a402bd13cc767cb2977973cc288349cb485d2a44c147658872e",
+    "role": "master",
+    "fullName": "Master Administrator (DMC)",
+    "createdAt": 1790171649067,
+    "status": "active",
+    "failedAttempts": 0,
+    "lastLogin": 1790171688262
+  }
+]

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { ref, push, set } from "firebase/database";
-import { rtdb } from "../lib/firebase";
+import { submitHelpdeskMessage } from "../lib/dataService";
 import {
   HelpCircle,
   Phone,
@@ -84,22 +83,22 @@ export default function HelpdeskPage({ faqs }: HelpdeskPageProps) {
     setErrorMsg("");
 
     try {
-      const contactsRef = ref(rtdb, "contacts");
-      const newTicketRef = push(contactsRef);
       const ticketId = `TICKET-${Math.floor(100000 + Math.random() * 900000)}`;
 
-      await set(newTicketRef, {
-        id: newTicketRef.key,
+      await submitHelpdeskMessage({
         name: name.trim(),
         rollNumber: rollNumber.trim() || "N/A",
         faculty,
+        className: faculty,
         phone: phone.trim(),
+        contactInfo: phone.trim(),
         email: email.trim() || "N/A",
         subject: `[Helpdesk] ${category}`,
         category,
         message: message.trim(),
         tag: "FSU Helpdesk Ticket",
         ticketId,
+        trackingCode: ticketId,
         createdAt: Date.now(),
         status: "Open",
       });

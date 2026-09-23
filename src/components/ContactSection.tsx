@@ -1,7 +1,5 @@
 import React, { useState } from "react";
-import { push, ref } from "firebase/database";
-import { rtdb } from "../lib/firebase";
-import { saveTrackedComplaint } from "../lib/dataService";
+import { saveTrackedComplaint, submitHelpdeskMessage } from "../lib/dataService";
 import {
   Mail,
   Phone,
@@ -70,13 +68,8 @@ export default function ContactSection({ onOpenTracker }: ContactSectionProps) {
       createdAt: Date.now(),
     };
 
-    // Cache locally so student can track instantly
-    saveTrackedComplaint(submission);
-
     try {
-      const contactsRef = ref(rtdb, "contacts");
-      await push(contactsRef, submission);
-
+      await submitHelpdeskMessage(submission);
       setGeneratedTrackingCode(trackingCode);
       setSuccess(true);
 
@@ -89,7 +82,7 @@ export default function ContactSection({ onOpenTracker }: ContactSectionProps) {
       setImageUrl("");
       setIsAnonymous(false);
     } catch (err: any) {
-      console.warn("Notice saving message to remote database:", err);
+      console.warn("Notice saving message to database:", err);
       // Even if remote push encounters an issue, the ticket is safely registered locally
       setGeneratedTrackingCode(trackingCode);
       setSuccess(true);

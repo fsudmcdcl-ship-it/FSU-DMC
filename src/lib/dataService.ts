@@ -281,3 +281,87 @@ export function getTrackedComplaint(codeOrId: string): ContactSubmission | null 
   }
   return null;
 }
+
+/**
+ * Retrieves all locally cached tracked complaints.
+ */
+export function getAllTrackedComplaints(): ContactSubmission[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(TRACKED_COMPLAINTS_KEY);
+    if (!raw) return [];
+    const items: Record<string, ContactSubmission> = JSON.parse(raw);
+    const seen = new Set<string>();
+    const list: ContactSubmission[] = [];
+    for (const val of Object.values(items)) {
+      const id = val.id || val.trackingCode || val.ticketId;
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        list.push(val);
+      }
+    }
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Unified submission helper for Helpdesk tickets, Student Grievances, and Secretariat requests.
+ * Persists to server API, Firebase RTDB, and local cache.
+ */
+export async function submitHelpdeskMessage(
+  submission: Partial<ContactSubmission>
+): Promise<{ success: boolean; id: string; trackingCode: string }> {
+  const rand = Math.floor(100000 + Math.random() * 900000).toString();
+  const trackingCode = (submission.trackingCode || submission.ticketId || `FSU-COMP-${rand}`).toUpperCase();
+  const id = submission.id || trackingCode;
+
+  const fullRecord: ContactSubmission = {
+    id,
+    name: submission.name || (submission.isAnonymous ? "Anonymous Student" : "Anonymous"),
+    className: submission.className || submission.faculty || "N/A",
+    semester: submission.semester || "N/A",
+    contactInfo: submission.contactInfo || submission.phone || (submission.isAnonymous ? "Confidential" : "Not Provided"),
+    phone: submission.phone,
+    email: submission.email,
+    rollNumber: submission.rollNumber,
+    faculty: submission.faculty || submission.className,
+    category: submission.category || "General Inquiry",
+    ticketId: submission.ticketId || trackingCode,
+    trackingCode,
+    tag: submission.tag || "FSU Helpdesk Ticket",
+    status: submission.status || "Pending",
+    subject: submission.subject || `Inquiry from ${submission.name || "Student"}`,
+    message: submission.message || "",
+    imageUrl: submission.imageUrl,
+    isAnonymous: Boolean(submission.isAnonymous),
+    createdAt: submission.createdAt || Date.now(),
+    adminRemarks: submission.adminRemarks || "",
+    adminRemarkUpdatedAt: submission.adminRemarkUpdatedAt,
+  };
+
+  // 1. Cache locally for instant student tracking
+  saveTrackedComplaint(fullRecord);
+
+  // 2. Submit to server /api/messages
+  try {
+    await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fullRecord),
+    });
+  } catch (err) {
+    console.warn("Failed to post message to /api/messages:", err);
+  }
+
+  // 3. Push to Firebase RTDB
+  try {
+    const contactsRef = ref(rtdb, `contacts/${id}`);
+    await set(contactsRef, fullRecord);
+  } catch (err) {
+    console.warn("Failed to set in RTDB contacts:", err);
+  }
+
+  return { success: true, id, trackingCode };
+}

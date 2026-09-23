@@ -97,9 +97,14 @@ export async function syncAdminsWithFirebase() {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.admins)) {
-        const mapped: Record<string, SystemAdmin> = {};
+        const local = getLocalAdmins();
+        const mapped: Record<string, SystemAdmin> = { ...local };
         data.admins.forEach((adm: SystemAdmin) => {
-          mapped[adm.id] = adm;
+          mapped[adm.id] = {
+            ...adm,
+            // Preserve locally saved password if present
+            password: local[adm.id]?.password || adm.password,
+          };
         });
         saveLocalAdmins(mapped);
         return mapped;
@@ -116,7 +121,15 @@ export async function syncAdminsWithFirebase() {
       const dbAdmins = snapshot.val();
       if (dbAdmins && typeof dbAdmins === "object") {
         const local = getLocalAdmins();
-        const merged = { ...local, ...dbAdmins };
+        const merged: Record<string, SystemAdmin> = { ...local };
+        Object.entries(dbAdmins).forEach(([id, adm]: [string, any]) => {
+          if (adm && adm.username) {
+            merged[id] = {
+              ...adm,
+              password: local[id]?.password,
+            };
+          }
+        });
         saveLocalAdmins(merged);
         return merged;
       }
@@ -133,11 +146,11 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * Retrieves the currently logged-in AdminUser session.
+ * Retrieves the currently logged-in AdminUser session for the active tab only.
  */
 export function getCurrentAdminUser(): AdminUser | null {
   try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY) || localStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -151,8 +164,11 @@ export function getCurrentAdminUser(): AdminUser | null {
 export function setStoredAdminUser(user: AdminUser | null): void {
   try {
     if (user) {
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
+      // Do not leave in localStorage so user is asked every time
+      localStorage.removeItem(SESSION_STORAGE_KEY);
     } else {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
       localStorage.removeItem(SESSION_STORAGE_KEY);
     }
   } catch (e) {
@@ -184,6 +200,7 @@ export function onAdminAuthStateChanged(
  * Authenticates an admin.
  * Communicates with server-side /api/auth/login for secure hash validation
  * and enforces the 3-attempt account lockout policy.
+ * EVERY administrator (both Master and Secondary) MUST provide a valid matching password.
  */
 export async function loginAdminWithCredentials(
   usernameInput: string,
@@ -240,14 +257,15 @@ export async function loginAdminWithCredentials(
       return { success: false, error: data.error, isLocked: true };
     }
 
-    if (data.error) {
+    // If server returned specific password mismatch or lockout error, report it directly
+    if (data.error && !data.error.toLowerCase().includes("not found")) {
       return { success: false, error: data.error };
     }
   } catch (err) {
     console.warn("Server auth failed, falling back to secure local validation:", err);
   }
 
-  // 2. Client-side fallback with lockout enforcement
+  // 2. Client-side fallback with strict password and lockout enforcement
   const allAdmins = getLocalAdmins();
   const foundAdmin = Object.values(allAdmins).find(
     (a) => a.username.toLowerCase() === cleanUsername.toLowerCase()
@@ -272,8 +290,16 @@ export async function loginAdminWithCredentials(
   const failedMap = getLocalFailedAttempts();
   const currentAttempts = (failedMap[cleanUsername.toLowerCase()] || 0);
 
-  // Check password if available locally
-  if (foundAdmin.password && foundAdmin.password !== cleanPassword) {
+  // STRICT PASSWORD REQUIREMENT:
+  // An administrator account must have a password and it MUST match cleanPassword
+  if (!foundAdmin.password) {
+    return {
+      success: false,
+      error: "No password configured for this administrator account. Please contact the Master Administrator.",
+    };
+  }
+
+  if (foundAdmin.password !== cleanPassword) {
     const newAttempts = currentAttempts + 1;
     failedMap[cleanUsername.toLowerCase()] = newAttempts;
     saveLocalFailedAttempts(failedMap);
@@ -380,6 +406,10 @@ export async function unlockAdminAccount(
  * Logs out the active admin.
  */
 export function signOutAdmin(): void {
+  try {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {}
   setStoredAdminUser(null);
 }
 
@@ -481,6 +511,21 @@ export async function createSubAdmin(
   allAdmins[newId] = newAdmin;
   saveLocalAdmins(allAdmins);
 
+  // Sync to Firebase Realtime Database
+  try {
+    await set(ref(rtdb, `admins/${newId}`), {
+      id: newId,
+      username: cleanUser,
+      fullName: cleanName,
+      role,
+      createdAt: Date.now(),
+      status: "active",
+      failedAttempts: 0,
+    });
+  } catch {
+    // RTDB fallback
+  }
+
   return { success: true, admin: newAdmin };
 }
 
@@ -516,6 +561,12 @@ export async function deleteSecondaryAdmin(
 
   delete allAdmins[adminId];
   saveLocalAdmins(allAdmins);
+
+  try {
+    await remove(ref(rtdb, `admins/${adminId}`));
+  } catch {
+    // RTDB fallback
+  }
 
   return { success: true };
 }

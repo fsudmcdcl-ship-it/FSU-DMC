@@ -424,6 +424,9 @@ export default function AdminAccountsManager({
                   placeholder="••••••••"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-blue-900 focus:outline-none bg-slate-50/50"
                 />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Required on every visit: The secondary admin must enter this password each time they log in to the CMS.
+                </p>
               </div>
             </div>
 
