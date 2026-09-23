@@ -14,6 +14,7 @@ import {
   loginAdminWithCredentials
 } from "../lib/authService";
 import ImageUploadInput from "./ImageUploadInput";
+import RichTextEditor from "./cms/RichTextEditor";
 import FaqManager from "./cms/FaqManager";
 import AdminAccountsManager from "./cms/AdminAccountsManager";
 import TrackingSettingsManager from "./cms/TrackingSettingsManager";
@@ -646,6 +647,45 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     );
   }
 
+  // Role check: Complaint Handlers / Reviewers only have access to #messages, not broader CMS content
+  if (user && user.role === "reviewer") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-sm">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-widest text-amber-700 font-mono block mb-1">
+              Restricted Role Workspace
+            </span>
+            <h2 className="text-xl font-serif font-black text-slate-900">
+              Complaint Handler / Reviewer
+            </h2>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+              Your account is authorized specifically for reviewing student grievances, inquiries, and status updates on the Helpdesk Messages inbox. Managing institutional site content (notices, staff, syllabus) is reserved for Master and Secondary Admins.
+            </p>
+          </div>
+
+          <div className="pt-2 space-y-2">
+            <a
+              href="#messages"
+              className="w-full py-3 px-4 rounded-xl bg-blue-950 hover:bg-blue-900 text-white font-bold text-xs uppercase tracking-wider transition shadow-md flex items-center justify-center gap-2"
+            >
+              <span>Go to Messages Workstation</span>
+            </a>
+            <button
+              onClick={onGoHome}
+              className="w-full py-2 text-slate-500 hover:text-slate-900 text-xs font-bold transition cursor-pointer"
+            >
+              ← Return to Public Website
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
       {/* Toast feedback notifications */}
@@ -932,33 +972,18 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               </div>
 
               {/* Logo URL */}
-              <div>
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Official Institutional Logo URL</label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={genSettingsForm.logoUrl || ""}
-                    onChange={(e) => setGenSettingsForm({ ...genSettingsForm, logoUrl: e.target.value })}
-                    className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-xs"
-                    placeholder="https://..."
-                  />
-                  <label className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 border border-slate-200 shrink-0">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, (b64) => setGenSettingsForm({ ...genSettingsForm, logoUrl: b64 }))}
-                    />
-                  </label>
-                </div>
-              </div>
+              <ImageUploadInput
+                label="Official Institutional Logo"
+                value={genSettingsForm.logoUrl || ""}
+                onChange={(url) => setGenSettingsForm({ ...genSettingsForm, logoUrl: url })}
+                placeholder="Institutional logo URL or upload image file..."
+                helpText="Displayed in the header and footer branding across the portal."
+              />
 
               {/* FSU President Section */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                 <span className="text-xs font-bold text-red-700 uppercase tracking-wider block">FSU President Message & Details</span>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
                   <div>
                     <label className="text-[11px] font-semibold text-gray-600 block mb-1">President Full Name</label>
                     <input
@@ -969,12 +994,11 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-600 block mb-1">President Photo URL</label>
-                    <input
-                      type="text"
+                    <ImageUploadInput
+                      label="President Photo"
                       value={genSettingsForm.presidentPhoto || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, presidentPhoto: e.target.value })}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                      onChange={(url) => setGenSettingsForm({ ...genSettingsForm, presidentPhoto: url })}
+                      placeholder="President photo URL or upload..."
                     />
                   </div>
                 </div>
@@ -992,7 +1016,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               {/* Campus Chief Section */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                 <span className="text-xs font-bold text-blue-900 uppercase tracking-wider block">Campus Chief Message & Details</span>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
                   <div>
                     <label className="text-[11px] font-semibold text-gray-600 block mb-1">Campus Chief Full Name & Title</label>
                     <input
@@ -1003,12 +1027,11 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-600 block mb-1">Chief Photo URL</label>
-                    <input
-                      type="text"
+                    <ImageUploadInput
+                      label="Campus Chief Photo"
                       value={genSettingsForm.chiefPhoto || ""}
-                      onChange={(e) => setGenSettingsForm({ ...genSettingsForm, chiefPhoto: e.target.value })}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
+                      onChange={(url) => setGenSettingsForm({ ...genSettingsForm, chiefPhoto: url })}
+                      placeholder="Chief photo URL or upload..."
                     />
                   </div>
                 </div>
@@ -1223,28 +1246,13 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                     className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Slide Image URL</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newSlide.imageUrl}
-                      onChange={(e) => setNewSlide({ ...newSlide, imageUrl: e.target.value })}
-                      placeholder="https://images.unsplash.com/..."
-                      className="flex-1 p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono"
-                    />
-                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload(e, (b64) => setNewSlide({ ...newSlide, imageUrl: b64 }))}
-                      />
-                    </label>
-                  </div>
-                </div>
+                <ImageUploadInput
+                  label="Slide Image *"
+                  value={newSlide.imageUrl}
+                  onChange={(url) => setNewSlide({ ...newSlide, imageUrl: url })}
+                  placeholder="https://images.unsplash.com/... or upload photo"
+                  helpText="Recommended dimensions: 1920x800 for optimal carousel appearance."
+                />
                 <button
                   onClick={addSlide}
                   className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
@@ -1308,28 +1316,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                     className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Optional Feature Image URL</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newNews.imageUrl}
-                      onChange={(e) => setNewNews({ ...newNews, imageUrl: e.target.value })}
-                      placeholder="https://..."
-                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
-                    />
-                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload(e, (b64) => setNewNews({ ...newNews, imageUrl: b64 }))}
-                      />
-                    </label>
-                  </div>
-                </div>
+                <ImageUploadInput
+                  label="Optional Feature Image"
+                  value={newNews.imageUrl}
+                  onChange={(url) => setNewNews({ ...newNews, imageUrl: url })}
+                  placeholder="https://... or upload notice flyer"
+                />
                 <button
                   onClick={addNews}
                   className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
@@ -1404,28 +1396,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Photo URL</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newMember.imageUrl}
-                      onChange={(e) => setNewMember({ ...newMember, imageUrl: e.target.value })}
-                      placeholder="https://..."
-                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
-                    />
-                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload(e, (b64) => setNewMember({ ...newMember, imageUrl: b64 }))}
-                      />
-                    </label>
-                  </div>
-                </div>
+                <ImageUploadInput
+                  label="Representative Photo"
+                  value={newMember.imageUrl}
+                  onChange={(url) => setNewMember({ ...newMember, imageUrl: url })}
+                  placeholder="https://... or upload portrait photo"
+                />
                 <button
                   onClick={addMember}
                   className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
@@ -1554,37 +1530,19 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Article Body Content</label>
-                  <textarea
-                    rows={4}
+                  <RichTextEditor
+                    label="Article Body Content *"
                     value={newBlog.bodyEn}
-                    onChange={(e) => setNewBlog({ ...newBlog, bodyEn: e.target.value })}
-                    placeholder="Full article content..."
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm"
+                    onChange={(val) => setNewBlog({ ...newBlog, bodyEn: val })}
+                    placeholder="Full article content (supports formatting, headings, bullet lists, blockquotes, and links)..."
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Header Image URL</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newBlog.imageUrl}
-                      onChange={(e) => setNewBlog({ ...newBlog, imageUrl: e.target.value })}
-                      placeholder="https://..."
-                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
-                    />
-                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload(e, (b64) => setNewBlog({ ...newBlog, imageUrl: b64 }))}
-                      />
-                    </label>
-                  </div>
-                </div>
+                <ImageUploadInput
+                  label="Header Feature Image"
+                  value={newBlog.imageUrl}
+                  onChange={(url) => setNewBlog({ ...newBlog, imageUrl: url })}
+                  placeholder="https://... or upload header photo"
+                />
                 <button
                   onClick={addBlog}
                   className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
@@ -1692,28 +1650,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-1">Modal Flyer / Image URL</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={importantNoticeForm.imageUrl || ""}
-                    onChange={(e) => setImportantNoticeForm({ ...importantNoticeForm, imageUrl: e.target.value })}
-                    placeholder="https://..."
-                    className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
-                  />
-                  <label className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 border border-slate-200 shrink-0">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload Flyer</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, (b64) => setImportantNoticeForm({ ...importantNoticeForm, imageUrl: b64 }))}
-                    />
-                  </label>
-                </div>
-              </div>
+              <ImageUploadInput
+                label="Modal Flyer / Image"
+                value={importantNoticeForm.imageUrl || ""}
+                onChange={(url) => setImportantNoticeForm({ ...importantNoticeForm, imageUrl: url })}
+                placeholder="https://... or upload flyer image"
+              />
             </div>
           )}
 
@@ -1797,28 +1739,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Photo URL</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newStaff.imageUrl}
-                      onChange={(e) => setNewStaff({ ...newStaff, imageUrl: e.target.value })}
-                      placeholder="https://..."
-                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
-                    />
-                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload(e, (b64) => setNewStaff({ ...newStaff, imageUrl: b64 }))}
-                      />
-                    </label>
-                  </div>
-                </div>
+                <ImageUploadInput
+                  label="Staff Photo"
+                  value={newStaff.imageUrl}
+                  onChange={(url) => setNewStaff({ ...newStaff, imageUrl: url })}
+                  placeholder="https://... or upload staff member photo"
+                />
 
                 <button
                   onClick={addStaff}
@@ -1932,28 +1858,12 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Photo URL</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newProf.imageUrl}
-                      onChange={(e) => setNewProf({ ...newProf, imageUrl: e.target.value })}
-                      placeholder="https://..."
-                      className="flex-1 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono"
-                    />
-                    <label className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1 shrink-0">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload(e, (b64) => setNewProf({ ...newProf, imageUrl: b64 }))}
-                      />
-                    </label>
-                  </div>
-                </div>
+                <ImageUploadInput
+                  label="Faculty / Professor Photo"
+                  value={newProf.imageUrl}
+                  onChange={(url) => setNewProf({ ...newProf, imageUrl: url })}
+                  placeholder="https://... or upload professor portrait"
+                />
 
                 <button
                   onClick={addProfessor}

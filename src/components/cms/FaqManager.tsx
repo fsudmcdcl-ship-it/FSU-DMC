@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { FaqItem } from "../../types";
 import { DEFAULT_DB_STATE } from "../../lib/defaults";
 import { saveSubItem, updateSubItem, deleteSubItem } from "../../lib/dataService";
+import RichTextEditor from "./RichTextEditor";
 import {
   HelpCircle,
   Plus,
@@ -174,16 +175,12 @@ export default function FaqManager({ faqs, onShowToast }: FaqManagerProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Answer Description *
-            </label>
-            <textarea
-              rows={3}
-              required
-              placeholder="Provide a clear, detailed answer for students..."
+            <RichTextEditor
+              label="Answer Description *"
               value={newAnswer}
-              onChange={(e) => setNewAnswer(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none bg-slate-50/50"
+              onChange={setNewAnswer}
+              placeholder="Provide a clear, detailed answer for students (supports formatting, bullet points, tables, and links)..."
+              helpText="Use formatting buttons or shortcuts (Ctrl+B, Ctrl+I, Ctrl+K) to style the answer."
             />
           </div>
 
@@ -347,15 +344,11 @@ export default function FaqManager({ faqs, onShowToast }: FaqManagerProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Answer Text
-                </label>
-                <textarea
-                  rows={4}
-                  required
+                <RichTextEditor
+                  label="Answer Text *"
                   value={editingFaq.answerEn}
-                  onChange={(e) => setEditingFaq({ ...editingFaq, answerEn: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                  onChange={(val) => setEditingFaq({ ...editingFaq, answerEn: val })}
+                  placeholder="Provide a clear, detailed answer..."
                 />
               </div>
 
