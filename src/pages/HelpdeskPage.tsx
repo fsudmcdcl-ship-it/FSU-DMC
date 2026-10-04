@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { submitHelpdeskMessage } from "../lib/dataService";
+import { saveSubItem, saveTrackedComplaint } from "../lib/dataService";
 import {
   HelpCircle,
   Phone,
@@ -84,15 +84,15 @@ export default function HelpdeskPage({ faqs }: HelpdeskPageProps) {
 
     try {
       const ticketId = `TICKET-${Math.floor(100000 + Math.random() * 900000)}`;
-
-      await submitHelpdeskMessage({
+      const submission = {
+        id: ticketId,
         name: name.trim(),
         rollNumber: rollNumber.trim() || "N/A",
         faculty,
         className: faculty,
         phone: phone.trim(),
-        contactInfo: phone.trim(),
         email: email.trim() || "N/A",
+        contactInfo: `${phone.trim()}${email.trim() ? ` / ${email.trim()}` : ""}`,
         subject: `[Helpdesk] ${category}`,
         category,
         message: message.trim(),
@@ -100,8 +100,12 @@ export default function HelpdeskPage({ faqs }: HelpdeskPageProps) {
         ticketId,
         trackingCode: ticketId,
         createdAt: Date.now(),
-        status: "Open",
-      });
+        status: "Pending",
+        adminRemarks: "",
+      };
+
+      saveTrackedComplaint(submission);
+      await saveSubItem("contacts", ticketId, submission);
 
       setSubmittedTicketId(ticketId);
       setName("");

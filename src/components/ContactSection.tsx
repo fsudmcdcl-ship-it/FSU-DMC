@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { saveTrackedComplaint, submitHelpdeskMessage } from "../lib/dataService";
+import { saveTrackedComplaint, saveSubItem } from "../lib/dataService";
 import {
   Mail,
   Phone,
@@ -68,8 +68,12 @@ export default function ContactSection({ onOpenTracker }: ContactSectionProps) {
       createdAt: Date.now(),
     };
 
+    // Cache locally so student can track instantly
+    saveTrackedComplaint(submission);
+
     try {
-      await submitHelpdeskMessage(submission);
+      await saveSubItem("contacts", trackingCode, submission);
+
       setGeneratedTrackingCode(trackingCode);
       setSuccess(true);
 
@@ -82,7 +86,7 @@ export default function ContactSection({ onOpenTracker }: ContactSectionProps) {
       setImageUrl("");
       setIsAnonymous(false);
     } catch (err: any) {
-      console.warn("Notice saving message to database:", err);
+      console.warn("Notice saving message to remote database:", err);
       // Even if remote push encounters an issue, the ticket is safely registered locally
       setGeneratedTrackingCode(trackingCode);
       setSuccess(true);

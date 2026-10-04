@@ -59,30 +59,6 @@ export function setLocalNodeData<K extends keyof DatabaseState>(
 }
 
 /**
- * Fetches globally synchronized content from the server API, updating local cache
- * and ensuring all devices across the world display the exact same updated content.
- */
-export async function fetchGlobalContent(): Promise<DatabaseState | null> {
-  try {
-    const res = await fetch("/api/content");
-    if (!res.ok) return null;
-    const json = await res.json();
-    if (json.success && json.data) {
-      const remoteData = json.data as Partial<DatabaseState>;
-      for (const [k, v] of Object.entries(remoteData)) {
-        if (v !== undefined && v !== null) {
-          setLocalNodeData(k as keyof DatabaseState, v);
-        }
-      }
-      return loadInitialDbState();
-    }
-  } catch (err) {
-    console.warn("[DataService] Global server fetch notice:", err);
-  }
-  return null;
-}
-
-/**
  * Loads the complete initial database state instantly from local storage
  * merged with defaults, ensuring zero wait time and zero missing keys on first render.
  */
@@ -93,7 +69,6 @@ export function loadInitialDbState(): DatabaseState {
     "importantNotice",
     "slides",
     "news",
-    "courses",
     "downloads",
     "blogs",
     "team",
@@ -101,9 +76,8 @@ export function loadInitialDbState(): DatabaseState {
     "professors",
     "faqs",
     "trackingSettings",
+    "admins",
     "contacts",
-    "portalEntries",
-    "upcomingEvents",
   ];
 
   for (const key of keys) {
@@ -139,8 +113,8 @@ export function onLocalDataChanged(
 
 /**
  * Saves an entire node (e.g. generalSettings, importantNotice, trackingSettings).
- * Persists locally, synchronizes with the server global store for all devices,
- * and publishes to Firebase Realtime Database.
+ * Stores locally first, then attempts Firebase RTDB sync.
+ * Handles permission/network issues gracefully.
  */
 export async function saveNode<K extends keyof DatabaseState>(
   key: K,
@@ -149,40 +123,29 @@ export async function saveNode<K extends keyof DatabaseState>(
   // 1. Save locally and broadcast
   setLocalNodeData(key, data);
 
-  // 2. Persist to server API for immediate global synchronization across all devices
-  try {
-    await fetch(`/api/content/${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data }),
-    });
-  } catch (serverErr) {
-    console.warn(`[DataService] Server sync notice for "${key}":`, serverErr);
-  }
-
-  // 3. Publish to Firebase RTDB
+  // 2. Attempt RTDB sync
   try {
     await set(ref(rtdb, key), data);
     return {
       success: true,
       cloudSynced: true,
-      message: "Published live globally across all devices and saved to cloud database.",
+      message: "Published live to cloud database and saved locally.",
     };
   } catch (err: any) {
     console.warn(
-      `[DataService] RTDB sync notice for node "${key}" (${err?.message || "permission restricted"}). Saved globally via server persistence.`
+      `[DataService] Cloud sync skipped for node "${key}" (${err?.message || "permission restricted"}). Saved locally.`
     );
     return {
       success: true,
-      cloudSynced: true,
-      message: "Published live globally across all devices.",
+      cloudSynced: false,
+      message:
+        "Saved successfully to local storage. (To sync with cloud across all devices, deploy database.rules.json in Firebase Console).",
     };
   }
 }
 
 /**
- * Saves a sub-item in a collection node (e.g. faqs, staff, professors, news, team, courses, downloads, blogs).
- * Persists locally, synchronizes globally via the server API, and pushes to Firebase RTDB.
+ * Saves a sub-item in a collection node (e.g. faqs, staff, professors, news, team).
  */
 export async function saveSubItem(
   node: keyof DatabaseState,
@@ -193,33 +156,25 @@ export async function saveSubItem(
   currentCollection[id] = item;
   setLocalNodeData(node, currentCollection);
 
-  // 1. Persist to server API globally
-  try {
-    await fetch(`/api/content/${node}/${id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ item }),
-    });
-  } catch (serverErr) {
-    console.warn(`[DataService] Server item sync notice for ${node}/${id}:`, serverErr);
+  if (node === "contacts") {
+    syncTrackedComplaintUpdate(id, item);
   }
 
-  // 2. Publish to Firebase RTDB
   try {
     await set(ref(rtdb, `${node}/${id}`), item);
     return {
       success: true,
       cloudSynced: true,
-      message: "Published live globally.",
+      message: "Published live to cloud database.",
     };
   } catch (err: any) {
     console.warn(
-      `[DataService] RTDB item sync notice for ${node}/${id} (${err?.message || "permission restricted"}). Saved globally.`
+      `[DataService] Cloud sync skipped for ${node}/${id} (${err?.message || "permission restricted"}). Saved locally.`
     );
     return {
       success: true,
-      cloudSynced: true,
-      message: "Saved live globally across all devices.",
+      cloudSynced: false,
+      message: "Saved to local storage.",
     };
   }
 }
@@ -235,39 +190,36 @@ export async function updateSubItem(
   const currentCollection = { ...((getLocalNodeData(node) as any) || {}) };
   if (currentCollection[id]) {
     currentCollection[id] = { ...currentCollection[id], ...updates };
-    setLocalNodeData(node, currentCollection);
+  } else {
+    currentCollection[id] = { id, ...updates };
+  }
+  setLocalNodeData(node, currentCollection);
+
+  if (node === "contacts") {
+    syncTrackedComplaintUpdate(id, updates);
   }
 
-  // Persist to server API
-  try {
-    await fetch(`/api/content/${node}/${id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ item: currentCollection[id] }),
-    });
-  } catch (e) {
-    console.warn("Server update error:", e);
-  }
-
-  // Update in RTDB
   try {
     await update(ref(rtdb, `${node}/${id}`), updates);
     return {
       success: true,
       cloudSynced: true,
-      message: "Updated live globally.",
+      message: "Updated in cloud database.",
     };
   } catch (err: any) {
+    console.warn(
+      `[DataService] Cloud update skipped for ${node}/${id} (${err?.message || "permission restricted"}). Updated locally.`
+    );
     return {
       success: true,
-      cloudSynced: true,
-      message: "Updated live globally across all devices.",
+      cloudSynced: false,
+      message: "Updated in local storage.",
     };
   }
 }
 
 /**
- * Deletes a sub-item from a collection node globally.
+ * Deletes a sub-item from a collection node.
  */
 export async function deleteSubItem(
   node: keyof DatabaseState,
@@ -277,35 +229,32 @@ export async function deleteSubItem(
   delete currentCollection[id];
   setLocalNodeData(node, currentCollection);
 
-  // 1. Delete on server API
-  try {
-    await fetch(`/api/content/${node}/${id}`, {
-      method: "DELETE",
-    });
-  } catch (serverErr) {
-    console.warn(`[DataService] Server delete notice for ${node}/${id}:`, serverErr);
+  if (node === "contacts") {
+    syncTrackedComplaintUpdate(id, null);
   }
 
-  // 2. Delete from Firebase RTDB
   try {
     await remove(ref(rtdb, `${node}/${id}`));
     return {
       success: true,
       cloudSynced: true,
-      message: "Removed globally from cloud database.",
+      message: "Removed from cloud database.",
     };
   } catch (err: any) {
-    console.warn(`[DataService] RTDB delete notice for ${node}/${id}:`, err);
+    console.warn(
+      `[DataService] Cloud delete skipped for ${node}/${id} (${err?.message || "permission restricted"}). Removed locally.`
+    );
     return {
       success: true,
-      cloudSynced: true,
-      message: "Removed globally from all devices.",
+      cloudSynced: false,
+      message: "Removed from local storage.",
     };
   }
 }
 
 /**
- * Saves a student complaint to local cache so the student can track it immediately.
+ * Saves a student complaint to local cache so the student can track it immediately,
+ * even before administrative review or if public read permissions are restricted.
  */
 export function saveTrackedComplaint(complaint: ContactSubmission): void {
   if (typeof window === "undefined") return;
@@ -316,23 +265,94 @@ export function saveTrackedComplaint(complaint: ContactSubmission): void {
     existing[key] = complaint;
     if (complaint.id) existing[complaint.id] = complaint;
     localStorage.setItem(TRACKED_COMPLAINTS_KEY, JSON.stringify(existing));
+
+    // Also persist inside contacts node so #messages portal sees it immediately
+    const currentContacts = { ...((getLocalNodeData("contacts") as any) || {}) };
+    const itemId = complaint.id || key;
+    currentContacts[itemId] = { ...complaint, id: itemId };
+    setLocalNodeData("contacts", currentContacts);
   } catch (e) {
     console.warn("[DataService] Could not cache tracked complaint locally:", e);
   }
 }
 
 /**
- * Finds a complaint by tracking code or ID from local cache.
+ * Synchronizes updates/deletions on a contact record with TRACKED_COMPLAINTS_KEY
+ */
+export function syncTrackedComplaintUpdate(
+  id: string,
+  updates: Partial<ContactSubmission> | null
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(TRACKED_COMPLAINTS_KEY);
+    const existing: Record<string, ContactSubmission> = raw ? JSON.parse(raw) : {};
+    let modified = false;
+
+    for (const [k, v] of Object.entries(existing)) {
+      if (k === id || v.id === id || v.trackingCode === id || v.ticketId === id) {
+        if (updates === null) {
+          delete existing[k];
+        } else {
+          existing[k] = { ...v, ...updates };
+        }
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      localStorage.setItem(TRACKED_COMPLAINTS_KEY, JSON.stringify(existing));
+    }
+  } catch (e) {
+    console.warn("[DataService] Could not sync tracked complaint:", e);
+  }
+}
+
+/**
+ * Returns all merged contacts from local node storage + tracked complaints cache.
+ */
+export function getAllLocalContacts(): Record<string, ContactSubmission> {
+  const fromNode = { ...((getLocalNodeData("contacts") as Record<string, ContactSubmission>) || {}) };
+  if (typeof window === "undefined") return fromNode;
+  try {
+    const raw = localStorage.getItem(TRACKED_COMPLAINTS_KEY);
+    if (raw) {
+      const tracked: Record<string, ContactSubmission> = JSON.parse(raw);
+      for (const [, item] of Object.entries(tracked)) {
+        if (item && (item.id || item.trackingCode)) {
+          const itemKey = item.id || item.trackingCode!;
+          // Deduplicate by trackingCode if another record with same trackingCode already exists
+          const existingKey = Object.keys(fromNode).find(
+            (k) =>
+              k === itemKey ||
+              (item.trackingCode &&
+                (fromNode[k]?.trackingCode === item.trackingCode ||
+                  fromNode[k]?.ticketId === item.trackingCode))
+          );
+          if (existingKey) {
+            fromNode[existingKey] = { ...item, ...fromNode[existingKey], id: existingKey };
+          } else {
+            fromNode[itemKey] = { ...item, id: itemKey };
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore parse error
+  }
+  return fromNode;
+}
+
+/**
+ * Finds a complaint by tracking code or ID from local cache or contacts node.
  */
 export function getTrackedComplaint(codeOrId: string): ContactSubmission | null {
   if (typeof window === "undefined" || !codeOrId) return null;
-  try {
-    const raw = localStorage.getItem(TRACKED_COMPLAINTS_KEY);
-    if (!raw) return null;
-    const items: Record<string, ContactSubmission> = JSON.parse(raw);
-    const normalized = codeOrId.trim().toUpperCase().replace(/\s+/g, "");
+  const normalized = codeOrId.trim().toUpperCase().replace(/\s+/g, "");
 
-    for (const [key, val] of Object.entries(items)) {
+  try {
+    const allContacts = getAllLocalContacts();
+    for (const [key, val] of Object.entries(allContacts)) {
       const code = (val.trackingCode || val.ticketId || val.id || key).toUpperCase();
       if (code === normalized || key === codeOrId || val.id === codeOrId) {
         return val;
@@ -342,88 +362,4 @@ export function getTrackedComplaint(codeOrId: string): ContactSubmission | null 
     // Return null on lookup failure
   }
   return null;
-}
-
-/**
- * Retrieves all locally cached tracked complaints.
- */
-export function getAllTrackedComplaints(): ContactSubmission[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(TRACKED_COMPLAINTS_KEY);
-    if (!raw) return [];
-    const items: Record<string, ContactSubmission> = JSON.parse(raw);
-    const seen = new Set<string>();
-    const list: ContactSubmission[] = [];
-    for (const val of Object.values(items)) {
-      const id = val.id || val.trackingCode || val.ticketId;
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        list.push(val);
-      }
-    }
-    return list;
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Unified submission helper for Helpdesk tickets, Student Grievances, and Secretariat requests.
- * Persists to server API, Firebase RTDB, and local cache.
- */
-export async function submitHelpdeskMessage(
-  submission: Partial<ContactSubmission>
-): Promise<{ success: boolean; id: string; trackingCode: string }> {
-  const rand = Math.floor(100000 + Math.random() * 900000).toString();
-  const trackingCode = (submission.trackingCode || submission.ticketId || `FSU-COMP-${rand}`).toUpperCase();
-  const id = submission.id || trackingCode;
-
-  const fullRecord: ContactSubmission = {
-    id,
-    name: submission.name || (submission.isAnonymous ? "Anonymous Student" : "Anonymous"),
-    className: submission.className || submission.faculty || "N/A",
-    semester: submission.semester || "N/A",
-    contactInfo: submission.contactInfo || submission.phone || (submission.isAnonymous ? "Confidential" : "Not Provided"),
-    phone: submission.phone,
-    email: submission.email,
-    rollNumber: submission.rollNumber,
-    faculty: submission.faculty || submission.className,
-    category: submission.category || "General Inquiry",
-    ticketId: submission.ticketId || trackingCode,
-    trackingCode,
-    tag: submission.tag || "FSU Helpdesk Ticket",
-    status: submission.status || "Pending",
-    subject: submission.subject || `Inquiry from ${submission.name || "Student"}`,
-    message: submission.message || "",
-    imageUrl: submission.imageUrl,
-    isAnonymous: Boolean(submission.isAnonymous),
-    createdAt: submission.createdAt || Date.now(),
-    adminRemarks: submission.adminRemarks || "",
-    adminRemarkUpdatedAt: submission.adminRemarkUpdatedAt,
-  };
-
-  // 1. Cache locally for instant student tracking
-  saveTrackedComplaint(fullRecord);
-
-  // 2. Submit to server /api/messages
-  try {
-    await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(fullRecord),
-    });
-  } catch (err) {
-    console.warn("Failed to post message to /api/messages:", err);
-  }
-
-  // 3. Push to Firebase RTDB
-  try {
-    const contactsRef = ref(rtdb, `contacts/${id}`);
-    await set(contactsRef, fullRecord);
-  } catch (err) {
-    console.warn("Failed to set in RTDB contacts:", err);
-  }
-
-  return { success: true, id, trackingCode };
 }

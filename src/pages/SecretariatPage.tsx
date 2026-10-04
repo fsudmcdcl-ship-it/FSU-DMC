@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { submitHelpdeskMessage } from "../lib/dataService";
+import { saveSubItem, saveTrackedComplaint } from "../lib/dataService";
 import {
   Building2,
   Mail,
@@ -39,19 +39,31 @@ export default function SecretariatPage() {
     setErrorMsg("");
 
     try {
-      await submitHelpdeskMessage({
+      const apptId = `APPT-${Math.floor(100000 + Math.random() * 900000)}`;
+      const submission = {
+        id: apptId,
         name: visitorName.trim(),
         className: organization.trim() || "Independent Student / Stakeholder",
+        organization: organization.trim() || "Independent Student / Stakeholder",
         phone: phone.trim(),
-        contactInfo: phone.trim(),
         email: email.trim() || "N/A",
-        subject: `[Secretariat Meeting Request] ${meetingPurpose}`,
-        category: "Secretariat Appointment",
+        contactInfo: `${phone.trim()}${email.trim() ? ` / ${email.trim()}` : ""}`,
+        meetingPurpose,
+        category: meetingPurpose,
+        preferredDate: preferredDate || "Earliest Available",
+        semester: preferredDate ? `Preferred: ${preferredDate}` : "Earliest Available",
+        subject: `[Secretariat Appointment] ${meetingPurpose}`,
         message: `[Secretariat Meeting Request] ${meetingPurpose} (Preferred Date: ${preferredDate || "Earliest Available"}): ${details.trim()}`,
         tag: "Secretariat Appointment",
+        trackingCode: apptId,
+        ticketId: apptId,
         createdAt: Date.now(),
-        status: "Pending Review",
-      });
+        status: "Pending",
+        adminRemarks: "",
+      };
+
+      saveTrackedComplaint(submission);
+      await saveSubItem("contacts", apptId, submission);
 
       setSuccessMsg(true);
       setVisitorName("");

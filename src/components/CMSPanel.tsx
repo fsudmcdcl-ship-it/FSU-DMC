@@ -6,7 +6,6 @@ import {
   AdminUser,
   onAdminAuthStateChanged,
   signInAdminWithEmail,
-  signInAdminWithGoogle,
   signOutAdmin,
   resetPasswordAdmin,
   getCurrentAdminUser,
@@ -16,10 +15,8 @@ import {
 import ImageUploadInput from "./ImageUploadInput";
 import RichTextEditor from "./cms/RichTextEditor";
 import FaqManager from "./cms/FaqManager";
-import AccountInfoManager from "./cms/AccountInfoManager";
+import AdminAccountsManager from "./cms/AdminAccountsManager";
 import TrackingSettingsManager from "./cms/TrackingSettingsManager";
-import CampusPortalManager from "./cms/CampusPortalManager";
-import UpcomingEventsManager from "./cms/UpcomingEventsManager";
 import {
   DatabaseState,
   GeneralSettings,
@@ -75,9 +72,7 @@ import {
   Clock,
   BookOpen,
   Phone,
-  RefreshCw,
-  LayoutGrid,
-  Calendar
+  RefreshCw
 } from "lucide-react";
 
 interface CMSPanelProps {
@@ -91,22 +86,20 @@ type CMSTab =
   | "general"
   | "slides"
   | "news"
+  | "courses"
   | "team"
   | "downloads"
   | "blogs"
   | "popup"
   | "staff"
   | "professors"
-  | "portal"
-  | "upcoming-events"
   | "helpdesk"
   | "faqs"
   | "tracking"
   | "admins";
 
 export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProps) {
-  // Always start in logged-out state so username and password are required every time
-  const [user, setUser] = useState<AdminUser | null>(null);
+  const [user, setUser] = useState<AdminUser | null>(getCurrentAdminUser());
   const [activeTab, setActiveTab] = useState<CMSTab>("general");
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
@@ -236,17 +229,13 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const [profFacultyFilter, setProfFacultyFilter] = useState("all");
 
   useEffect(() => {
-    // Synchronize with Firebase Auth session state
-    const unsubscribe = onAdminAuthStateChanged((activeUser) => {
-      setUser(activeUser);
-      if (activeUser) {
+    const unsubscribe = onAdminAuthStateChanged((currUser) => {
+      setUser(currUser);
+      if (currUser) {
         setAuthError("");
       }
     });
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -262,20 +251,13 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
   const handleSignOut = async () => {
     await signOutAdmin();
     setUser(null);
-    setEmail("");
-    setPassword("");
     setAuthError("");
-    setAuthSuccess("");
   };
 
-  const handleExitToHome = () => {
-    onGoHome();
-  };
-
-  const handleEmailPasswordLogin = async (e: React.FormEvent) => {
+  const handleCredentialsLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      setAuthError("Please provide both administrator email and password.");
+    if (!username.trim() || !password) {
+      setAuthError("Please provide both administrator username and password.");
       return;
     }
 
@@ -284,10 +266,14 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     setAuthSuccess("");
 
     try {
-      const loggedUser = await signInAdminWithEmail(email.trim(), password);
-      setUser(loggedUser);
-      setPassword("");
-      showToast(`Welcome back, ${loggedUser.displayName || loggedUser.email}!`);
+      const res = await loginAdminWithCredentials(username.trim(), password);
+      if (res.success && res.user) {
+        setUser(res.user);
+        setAuthError("");
+        showToast(`Welcome back, ${res.user.fullName || res.user.username}!`);
+      } else {
+        setAuthError(res.error || "Authentication failed. Invalid username or password.");
+      }
     } catch (err: any) {
       console.error("Auth Error:", err);
       setAuthError(err.message || "Failed to authenticate.");
@@ -296,18 +282,36 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleEmailPasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setAuthError("Please enter both authorized admin email and password.");
+      return;
+    }
+
+    const trimmedEmail = email.trim();
     setLoginLoading(true);
     setAuthError("");
     setAuthSuccess("");
 
     try {
-      const loggedUser = await signInAdminWithGoogle();
+      const loggedUser = await signInAdminWithEmail(trimmedEmail, password);
       setUser(loggedUser);
-      showToast(`Welcome, ${loggedUser.displayName || loggedUser.email}!`);
+      setAuthError("");
+      showToast("Successfully signed in to FSU CMS Control Center!");
     } catch (err: any) {
-      console.error("Google Auth Error:", err);
-      setAuthError(err.message || "Google sign-in failed.");
+      console.error("Auth Error:", err);
+      let errMsg = "Failed to authenticate. Please check your credentials.";
+      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+        errMsg = "Admin user not found or invalid credentials. If you need access, contact the FSU system administrator.";
+      } else if (err.code === "auth/wrong-password") {
+        errMsg = "Incorrect password. Click 'Forgot Password?' to reset it.";
+      } else if (err.code === "auth/too-many-requests") {
+        errMsg = "Access temporarily blocked due to repeated failed attempts. Please try again later or reset your password.";
+      } else if (err.message && !err.message.includes("api-key-not-valid")) {
+        errMsg = err.message;
+      }
+      setAuthError(errMsg);
     } finally {
       setLoginLoading(false);
     }
@@ -317,7 +321,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     e.preventDefault();
     const targetEmail = (resetEmail || email).trim();
     if (!targetEmail) {
-      setAuthError("Please enter your registered administrator email address.");
+      setAuthError("Please enter your registered admin email address.");
       return;
     }
 
@@ -326,12 +330,16 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     setAuthSuccess("");
 
     try {
-      await resetPasswordAdmin(targetEmail);
-      setAuthSuccess(`Password reset instructions have been sent to ${targetEmail}. Please check your inbox.`);
+      const successMsg = await resetPasswordAdmin(targetEmail);
+      setAuthSuccess(successMsg);
       setShowForgotPassword(false);
     } catch (err: any) {
       console.error("Password reset error:", err);
-      setAuthError(err.message || "Failed to dispatch password reset email. Please try again.");
+      if (err.code === "auth/user-not-found") {
+        setAuthError("No registered administrator found with this email.");
+      } else {
+        setAuthError(err.message || "Failed to dispatch password reset email. Please try again.");
+      }
     } finally {
       setResetLoading(false);
     }
@@ -869,7 +877,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     }
   };
 
-  // Login Screen Gate - Firebase Authentication
+  // Login Screen Gate
   if (!user) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4 bg-slate-50">
@@ -886,7 +894,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           </p>
 
           <p className="text-xs text-gray-500 mb-6 text-center leading-relaxed">
-            Authorized administrator portal for Free Student Union - DMC. Authenticate using your provisioned Google Firebase administrator credentials.
+            Authorized administrator portal for Free Student Union - DMC. Manage all website content, hero sliders, news, faculty, staff, syllabus, and emergency notices.
           </p>
 
           {authSuccess && (
@@ -903,22 +911,22 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             </div>
           )}
 
-          {/* Firebase Auth Email & Password Login Form */}
-          <form onSubmit={handleEmailPasswordLogin} className="w-full space-y-4">
+          {/* Master / Secondary Admin Login Form */}
+          <form onSubmit={handleCredentialsLogin} className="w-full space-y-4">
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Administrator Email
+                Admin Username
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                  <Mail className="w-4 h-4" />
+                  <Users className="w-4 h-4" />
                 </span>
                 <input
-                  type="email"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@fsudmc.com"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter administrator username"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
                 />
               </div>
@@ -929,13 +937,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
                   Password
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(!showForgotPassword)}
-                  className="text-[11px] text-blue-800 hover:text-blue-950 font-bold hover:underline cursor-pointer"
-                >
-                  Forgot Password?
-                </button>
+                <span className="text-[10px] text-slate-400 font-mono">Case-sensitive</span>
               </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
@@ -969,88 +971,13 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               ) : (
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
               )}
-              <span>Sign In with Firebase Auth</span>
-            </button>
-
-            {/* Optional Google Sign-In */}
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={loginLoading}
-              className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Sign In with Google</span>
+              <span>Log In to CMS Panel</span>
             </button>
           </form>
 
-          {/* Forgot password collapsible section */}
-          {showForgotPassword && (
-            <div className="w-full mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl animate-fade-in text-left">
-              <h4 className="text-xs font-bold text-slate-800 mb-1">Reset Password</h4>
-              <p className="text-[11px] text-slate-500 mb-3">
-                Enter your admin email to receive a password reset link from Firebase.
-              </p>
-              <form onSubmit={handleForgotPassword} className="space-y-2">
-                <input
-                  type="email"
-                  required
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="admin@fsudmc.com"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                />
-                <div className="flex items-center gap-2">
-                  <button
-                    type="submit"
-                    disabled={resetLoading}
-                    className="flex-1 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-bold transition disabled:opacity-50"
-                  >
-                    {resetLoading ? "Sending..." : "Send Reset Link"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotPassword(false)}
-                    className="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Security & Owner Provisioning Notice */}
-          <div className="w-full mt-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-left space-y-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Restricted Administrator Access</span>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Public self-registration is permanently disabled. Administrator accounts can only be created and authorized by the site owner directly inside the Google Firebase Console.
-            </p>
-          </div>
-
-          <div className="w-full space-y-3 mt-4">
+          <div className="w-full space-y-3 mt-6">
             <button
-              onClick={handleExitToHome}
+              onClick={onGoHome}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
             >
               ← Back to Main Public Page
@@ -1061,8 +988,96 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     );
   }
 
+  // Role check: Complaint Handlers / Reviewers only have access to #messages, not broader CMS content
+  if (user && user.role === "reviewer") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-sm">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-widest text-amber-700 font-mono block mb-1">
+              Restricted Role Workspace
+            </span>
+            <h2 className="text-xl font-serif font-black text-slate-900">
+              Complaint Handler / Reviewer
+            </h2>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+              Your account is authorized specifically for reviewing student grievances, inquiries, and status updates on the Helpdesk Messages inbox. Managing institutional site content (notices, staff, syllabus) is reserved for Master and Secondary Admins.
+            </p>
+          </div>
+
+          <div className="pt-2 space-y-2">
+            <a
+              href="#messages"
+              className="w-full py-3 px-4 rounded-xl bg-blue-950 hover:bg-blue-900 text-white font-bold text-xs uppercase tracking-wider transition shadow-md flex items-center justify-center gap-2"
+            >
+              <span>Go to Messages Workstation</span>
+            </a>
+            <button
+              onClick={onGoHome}
+              className="w-full py-2 text-slate-500 hover:text-slate-900 text-xs font-bold transition cursor-pointer"
+            >
+              ← Return to Public Website
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      {/* Delete / Archive Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-start gap-3.5">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                  confirmModal.confirmStyle === "warning"
+                    ? "bg-amber-50 text-amber-600 border border-amber-200"
+                    : "bg-red-50 text-red-600 border border-red-200"
+                }`}
+              >
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 flex-1">
+                <h3 className="text-base font-bold text-slate-900">{confirmModal.title}</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">{confirmModal.message}</p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const action = confirmModal.onConfirm;
+                  setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                  action();
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer ${
+                  confirmModal.confirmStyle === "warning"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{confirmModal.confirmLabel || "Confirm Delete"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast feedback notifications */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 p-4 bg-blue-950 text-white rounded-2xl shadow-2xl border border-blue-800 flex items-center gap-3 animate-fade-in">
@@ -1083,10 +1098,14 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           </h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className="text-xs text-blue-200/90 font-mono">
-              Admin: <strong className="text-emerald-300 font-bold">{user.email || user.fullName || user.displayName}</strong>
+              Admin: <strong className="text-emerald-300 font-bold">{user.fullName || user.username || user.email}</strong>
             </span>
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider font-mono bg-emerald-400 text-slate-950 font-bold">
-              Firebase Admin
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider font-mono ${
+              user.role === "master"
+                ? "bg-amber-400 text-slate-950 font-bold"
+                : "bg-blue-300 text-blue-950 font-bold"
+            }`}>
+              {user.role === "master" ? "Master Admin" : "Secondary Admin"}
             </span>
           </div>
         </div>
@@ -1123,7 +1142,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           </button>
 
           <button
-            onClick={handleExitToHome}
+            onClick={onGoHome}
             className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition"
           >
             Public Site
@@ -1131,7 +1150,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
 
           <button
             onClick={handleSignOut}
-            className="p-2.5 bg-red-700 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+            className="p-2.5 bg-red-700 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
             title="Sign Out"
           >
             <LogOut className="w-4 h-4" />
@@ -1248,26 +1267,6 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           </button>
 
           <button
-            onClick={() => setActiveTab("portal")}
-            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "portal" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4 text-amber-500" />
-            <span>Campus Portal Shortcuts</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("upcoming-events")}
-            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
-              activeTab === "upcoming-events" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
-            }`}
-          >
-            <Calendar className="w-4 h-4 text-amber-500" />
-            <span>Upcoming Events (/upcoming-event)</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab("faqs")}
             className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
               activeTab === "faqs" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
@@ -1308,12 +1307,14 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                <span>Admin Profile &amp; Auth</span>
+                <KeyRound className="w-4 h-4 text-amber-500" />
+                <span>Admin Accounts & Roles</span>
               </div>
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-800 font-bold text-[9px] uppercase font-mono">
-                Firebase
-              </span>
+              {user.role === "master" && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-bold text-[9px] uppercase font-mono">
+                  Master
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -2600,45 +2601,96 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             </div>
           )}
 
-          {/* TAB 8: CAMPUS STAFF DIRECTORY */}
+          {/* TAB 8: CAMPUS STAFF DIRECTORY - FULL CRUD */}
           {activeTab === "staff" && (
             <div className="space-y-6">
-              <div className="border-b border-gray-100 pb-4">
-                <h3 className="text-xl font-serif font-black text-slate-900">Campus Staff Directory</h3>
-                <p className="text-xs text-gray-500">Manage administrative, examination, finance, and library staff members.</p>
+              {/* Header & Overview Stats */}
+              <div className="border-b border-gray-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-serif font-black text-slate-900 flex items-center gap-2">
+                    <Briefcase className="w-5 h-5 text-blue-900" />
+                    Campus Staff Directory Management
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Add, edit, or remove administrative, examination, finance, and library staff members with instant live directory updates.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full font-bold">
+                    Total Staff: {staff.length}
+                  </span>
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold">
+                    Active: {staff.filter((s) => !s.status || s.status === "active").length}
+                  </span>
+                </div>
               </div>
 
-              <div id="staff-crud-form" className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                  {editingStaffId ? "Edit Staff Member" : "Add New Staff Member"}
-                </span>
+              {/* Staff Create / Edit Form */}
+              <div
+                id="staff-crud-form"
+                className={`p-5 rounded-2xl border transition-all ${
+                  editingStaffId
+                    ? "bg-amber-50/50 border-amber-300 shadow-md ring-2 ring-amber-400/20"
+                    : "bg-slate-50 border-slate-200"
+                } space-y-4`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {editingStaffId ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-600 text-white text-xs font-bold uppercase tracking-wider">
+                        <Edit className="w-3.5 h-3.5" />
+                        Editing Staff Member
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                        Add New Staff Member
+                      </span>
+                    )}
+                    {editingStaffId && (
+                      <span className="text-xs text-slate-500 font-mono">
+                        (ID: {editingStaffId})
+                      </span>
+                    )}
+                  </div>
+                  {editingStaffId && (
+                    <button
+                      type="button"
+                      onClick={cancelEditStaff}
+                      className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Cancel Edit</span>
+                    </button>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Full Name</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Full Name *</label>
                     <input
                       type="text"
                       value={newStaff.name}
                       onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
                       placeholder="e.g., Janak Raj Pant"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Designation</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Designation / Role *</label>
                     <input
                       type="text"
                       value={newStaff.designation}
                       onChange={(e) => setNewStaff({ ...newStaff, designation: e.target.value })}
                       placeholder="e.g., Campus Administrator"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Department</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Department</label>
                     <select
                       value={newStaff.department}
                       onChange={(e) => setNewStaff({ ...newStaff, department: e.target.value })}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     >
                       <option value="Administration">Administration</option>
                       <option value="Examination & Evaluation">Examination & Evaluation</option>
@@ -2651,57 +2703,105 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Official Email</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Official Email</label>
                     <input
                       type="email"
                       value={newStaff.email}
                       onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
                       placeholder="admin@fsudmc.com"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Contact Phone</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Contact Phone</label>
                     <input
                       type="text"
                       value={newStaff.phone}
                       onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
                       placeholder="+977-9848712345"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Office Room</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Office Room</label>
                     <input
                       type="text"
                       value={newStaff.office}
                       onChange={(e) => setNewStaff({ ...newStaff, office: e.target.value })}
                       placeholder="Main Admin Block, Room 101"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Working Hours</label>
+                    <input
+                      type="text"
+                      value={newStaff.workingHours}
+                      onChange={(e) => setNewStaff({ ...newStaff, workingHours: e.target.value })}
+                      placeholder="Sunday – Friday: 10:00 AM – 5:00 PM"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Directory Status</label>
+                    <select
+                      value={newStaff.status || "active"}
+                      onChange={(e) => setNewStaff({ ...newStaff, status: e.target.value as "active" | "inactive" })}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    >
+                      <option value="active">Active (Visible in Public Directory)</option>
+                      <option value="inactive">Inactive (On Leave / Hidden)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Display Order</label>
+                    <input
+                      type="number"
+                      value={newStaff.order || 1}
+                      onChange={(e) => setNewStaff({ ...newStaff, order: Number(e.target.value) })}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <ImageUploadInput
-                  label="Staff Photo"
+                  label="Staff Portrait Photo"
                   value={newStaff.imageUrl}
                   onChange={(url) => setNewStaff({ ...newStaff, imageUrl: url })}
                   placeholder="https://... or upload staff member photo"
                 />
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 pt-2">
                   <button
+                    type="button"
                     onClick={saveOrUpdateStaff}
-                    className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                    className={`px-6 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm text-white cursor-pointer ${
+                      editingStaffId
+                        ? "bg-emerald-700 hover:bg-emerald-800"
+                        : "bg-blue-950 hover:bg-blue-900"
+                    }`}
                   >
-                    {editingStaffId ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                    <span>{editingStaffId ? "Update Staff Member Live" : "Add Staff Member Live"}</span>
+                    {editingStaffId ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Update Staff Profile Live</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        <span>Add Staff Member Live</span>
+                      </>
+                    )}
                   </button>
+
                   {editingStaffId && (
                     <button
                       type="button"
                       onClick={cancelEditStaff}
-                      className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition"
+                      className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -2709,97 +2809,221 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                 </div>
               </div>
 
-              {/* Staff List */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {staff.map((s) => (
-                  <div key={s.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <img src={s.imageUrl || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200"} alt={s.name} className="w-12 h-12 rounded-xl object-cover border" />
-                      <div>
-                        <h4 className="font-bold text-sm text-slate-900">{s.name}</h4>
-                        <span className="text-xs text-blue-900 font-bold block">{s.designation}</span>
-                        <span className="text-[11px] text-slate-500 block">{s.department}</span>
-                        <span className="text-[10px] text-slate-400 font-mono block mt-1">{s.email} &bull; {s.phone}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => startEditStaff(s)}
-                        className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg transition"
-                        title="Edit Staff"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => requestDeleteStaff(s)}
-                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
-                        title="Delete Staff"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+              {/* Staff Directory Preview & Filter */}
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search staff by name, designation, or department..."
+                      value={staffSearchQuery}
+                      onChange={(e) => setStaffSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    />
                   </div>
-                ))}
+                  <select
+                    value={staffDeptFilter}
+                    onChange={(e) => setStaffDeptFilter(e.target.value)}
+                    className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                  >
+                    <option value="all">All Departments ({staff.length})</option>
+                    <option value="Administration">Administration</option>
+                    <option value="Examination & Evaluation">Examination & Evaluation</option>
+                    <option value="Finance & Accounts">Finance & Accounts</option>
+                    <option value="Library & Information Center">Library & Information Center</option>
+                    <option value="ICT & Technical Support">ICT & Technical Support</option>
+                  </select>
+                </div>
+
+                {/* Staff Preview Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {staff
+                    .filter((s) => {
+                      const matchesSearch =
+                        s.name.toLowerCase().includes(staffSearchQuery.toLowerCase()) ||
+                        s.designation.toLowerCase().includes(staffSearchQuery.toLowerCase()) ||
+                        s.department.toLowerCase().includes(staffSearchQuery.toLowerCase());
+                      const matchesDept = staffDeptFilter === "all" || s.department === staffDeptFilter;
+                      return matchesSearch && matchesDept;
+                    })
+                    .sort((a, b) => (a.order || 99) - (b.order || 99))
+                    .map((s) => {
+                      const isEditing = editingStaffId === s.id;
+                      const isActive = !s.status || s.status === "active";
+
+                      return (
+                        <div
+                          key={s.id}
+                          className={`p-4 bg-white rounded-2xl border transition-all shadow-sm flex flex-col justify-between gap-3 ${
+                            isEditing
+                              ? "border-amber-400 bg-amber-50/20 ring-2 ring-amber-300/30"
+                              : "border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3.5">
+                            <img
+                              src={s.imageUrl || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200"}
+                              alt={s.name}
+                              className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0"
+                            />
+                            <div className="space-y-1 flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="font-bold text-sm text-slate-900 truncate">{s.name}</h4>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                    isActive
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                      : "bg-slate-100 text-slate-600 border border-slate-200"
+                                  }`}
+                                >
+                                  {isActive ? "Active" : "Inactive"}
+                                </span>
+                              </div>
+                              <span className="text-xs text-blue-900 font-bold block">{s.designation}</span>
+                              <span className="inline-block text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md">
+                                {s.department}
+                              </span>
+                              <div className="text-[11px] text-slate-500 space-y-0.5 pt-1">
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                  <span className="font-mono">{s.email}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                  <span className="font-mono">{s.phone}</span>
+                                </div>
+                                {s.office && (
+                                  <div className="text-[10px] text-slate-400 truncate">
+                                    Office: {s.office}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => startEditStaff(s)}
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => requestDeleteStaff(s)}
+                              className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {staff.length === 0 && (
+                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">
+                    No staff members in the directory yet. Add a staff member using the form above.
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* TAB 9: PROFESSORS & FACULTY */}
+          {/* TAB 9: PROFESSORS & ACADEMIC DIRECTORY - FULL CRUD */}
           {activeTab === "professors" && (
             <div className="space-y-6">
-              <div className="border-b border-gray-100 pb-4">
-                <h3 className="text-xl font-serif font-black text-slate-900">Professors &amp; Academic Faculty Directory</h3>
-                <p className="text-xs text-gray-500">
-                  Manage academic records, designations, departments, qualifications, subjects, and biographical profiles for faculty members.
-                </p>
+              {/* Header & Overview Stats */}
+              <div className="border-b border-gray-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-serif font-black text-slate-900 flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-purple-900" />
+                    Professors & Academic Faculty Directory
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Manage academic professors, designations, departments, qualifications, subjects taught, and faculty bios.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full font-bold">
+                    Total Faculty: {professors.length}
+                  </span>
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold">
+                    Active: {professors.filter((p) => !p.status || p.status === "active").length}
+                  </span>
+                </div>
               </div>
 
-              {/* Professor Form */}
-              <div id="prof-crud-form" className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+              {/* Professor Create / Edit Form */}
+              <div
+                id="prof-crud-form"
+                className={`p-5 rounded-2xl border transition-all ${
+                  editingProfId
+                    ? "bg-amber-50/50 border-amber-300 shadow-md ring-2 ring-amber-400/20"
+                    : "bg-slate-50 border-slate-200"
+                } space-y-4`}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                    {editingProfId ? "Edit Faculty Member Record" : "Add New Faculty Member"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {editingProfId ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-600 text-white text-xs font-bold uppercase tracking-wider">
+                        <Edit className="w-3.5 h-3.5" />
+                        Editing Academic Faculty Record
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                        Add New Academic Faculty / Professor
+                      </span>
+                    )}
+                    {editingProfId && (
+                      <span className="text-xs text-slate-500 font-mono">
+                        (ID: {editingProfId})
+                      </span>
+                    )}
+                  </div>
                   {editingProfId && (
-                    <span className="text-[11px] font-mono bg-blue-100 text-blue-950 font-bold px-2 py-0.5 rounded-md">
-                      Editing: {editingProfId}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={cancelEditProf}
+                      className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Cancel Edit</span>
+                    </button>
                   )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">
-                      Full Name with Prefix <span className="text-red-500">*</span>
-                    </label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Full Name with Prefix *</label>
                     <input
                       type="text"
-                      required
                       value={newProf.name}
                       onChange={(e) => setNewProf({ ...newProf, name: e.target.value })}
-                      placeholder="e.g., Assoc. Prof. Dr. Dinesh Kumar Bhatt"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                      placeholder="e.g., Assoc. Prof. Dr. Dinesh Bhatt"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">
-                      Academic Designation / Title <span className="text-red-500">*</span>
-                    </label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Academic Title / Designation *</label>
                     <input
                       type="text"
-                      required
                       value={newProf.title}
                       onChange={(e) => setNewProf({ ...newProf, title: e.target.value })}
-                      placeholder="Campus Chief & Associate Professor"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                      placeholder="e.g., Campus Chief & Associate Professor"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Faculty Stream</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Faculty Stream</label>
                     <select
                       value={newProf.faculty}
                       onChange={(e) => setNewProf({ ...newProf, faculty: e.target.value })}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     >
                       <option value="Faculty of Management">Faculty of Management</option>
                       <option value="Faculty of Education">Faculty of Education</option>
@@ -2810,94 +3034,92 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Academic Department</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Department</label>
                     <input
                       type="text"
                       value={newProf.department}
                       onChange={(e) => setNewProf({ ...newProf, department: e.target.value })}
-                      placeholder="Business Administration & Strategy"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                      placeholder="e.g., Business Administration & Strategy"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Qualification & Degrees</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Academic Qualification / Records</label>
                     <input
                       type="text"
                       value={newProf.qualification}
                       onChange={(e) => setNewProf({ ...newProf, qualification: e.target.value })}
-                      placeholder="Ph.D. in Management, M.Phil, MBS"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                      placeholder="e.g., Ph.D. in Management, M.Phil, MBS"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Subjects (Comma-separated)</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Subjects Taught (Comma-separated)</label>
                     <input
                       type="text"
                       value={profSubjectsInput}
                       onChange={(e) => setProfSubjectsInput(e.target.value)}
                       placeholder="Strategic Management, Research Methods"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Research Interests & Specialization</label>
+                    <input
+                      type="text"
+                      value={newProf.researchInterests}
+                      onChange={(e) => setNewProf({ ...newProf, researchInterests: e.target.value })}
+                      placeholder="e.g., Higher Education Leadership, Mountain Regional Economic Development"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Academic Bio / Profile Summary</label>
+                    <textarea
+                      rows={2}
+                      value={newProf.bio || ""}
+                      onChange={(e) => setNewProf({ ...newProf, bio: e.target.value })}
+                      placeholder="Short academic biography, achievements, and teaching philosophy..."
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Official Email</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Official Email</label>
                     <input
                       type="email"
                       value={newProf.email}
                       onChange={(e) => setNewProf({ ...newProf, email: e.target.value })}
                       placeholder="faculty@fsudmc.com"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Phone / Extension</label>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Consultation / Office Hours</label>
                     <input
                       type="text"
-                      value={newProf.phone || ""}
-                      onChange={(e) => setNewProf({ ...newProf, phone: e.target.value })}
-                      placeholder="+977-9848712345"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Office Hours / Consultation</label>
-                    <input
-                      type="text"
-                      value={newProf.officeHours || ""}
+                      value={newProf.officeHours}
                       onChange={(e) => setNewProf({ ...newProf, officeHours: e.target.value })}
                       placeholder="Sunday – Thursday: 11:00 AM – 1:00 PM"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-900 focus:outline-none"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">
-                    Research Interests &amp; Specialization
-                  </label>
-                  <input
-                    type="text"
-                    value={newProf.researchInterests || ""}
-                    onChange={(e) => setNewProf({ ...newProf, researchInterests: e.target.value })}
-                    placeholder="Higher Education Leadership, Mountain Regional Economic Development..."
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">
-                    Faculty Biography &amp; Academic Background
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={newProf.bio || ""}
-                    onChange={(e) => setNewProf({ ...newProf, bio: e.target.value })}
-                    placeholder="Enter professor's academic biography, scholarly accomplishments, awards, and contributions to Darchula Multiple Campus..."
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-900"
-                  />
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Status</label>
+                    <select
+                      value={newProf.status || "active"}
+                      onChange={(e) => setNewProf({ ...newProf, status: e.target.value as "active" | "inactive" })}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    >
+                      <option value="active">Active (Visible in Directory)</option>
+                      <option value="inactive">Inactive (Sabbatical / Hidden)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <ImageUploadInput
@@ -2907,15 +3129,29 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                   placeholder="https://... or upload professor portrait"
                 />
 
-                <div className="flex items-center gap-2 pt-2">
+                <div className="flex items-center gap-3 pt-2">
                   <button
                     type="button"
                     onClick={saveOrUpdateProf}
-                    className="px-5 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    className={`px-6 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm text-white cursor-pointer ${
+                      editingProfId
+                        ? "bg-emerald-700 hover:bg-emerald-800"
+                        : "bg-blue-950 hover:bg-blue-900"
+                    }`}
                   >
-                    {editingProfId ? <Check className="w-4 h-4 text-amber-400" /> : <Plus className="w-4 h-4 text-amber-400" />}
-                    <span>{editingProfId ? "Update Professor Live" : "Add Professor Live"}</span>
+                    {editingProfId ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Update Faculty Record Live</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        <span>Add Professor Live</span>
+                      </>
+                    )}
                   </button>
+
                   {editingProfId && (
                     <button
                       type="button"
@@ -2928,202 +3164,173 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
                 </div>
               </div>
 
-              {/* CLEAN TABLE PREVIEW (TASK 3B) */}
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-serif font-black text-slate-900">
-                      Active Faculty Table Preview ({professors.length})
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Direct Edit and Delete actions with instant database synchronization.
-                    </p>
+              {/* Professors & Faculty Table Preview */}
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search professors by name, title, department, or subject..."
+                      value={profSearchQuery}
+                      onChange={(e) => setProfSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                    />
                   </div>
-
-                  {/* Filter and Search */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={profSearchQuery}
-                        onChange={(e) => setProfSearchQuery(e.target.value)}
-                        placeholder="Search name, title, dept..."
-                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-900"
-                      />
-                    </div>
-
-                    <select
-                      value={profFacultyFilter}
-                      onChange={(e) => setProfFacultyFilter(e.target.value)}
-                      className="py-1.5 px-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-900"
-                    >
-                      <option value="all">All Faculties</option>
-                      <option value="Faculty of Management">Management</option>
-                      <option value="Faculty of Education">Education</option>
-                      <option value="Faculty of Humanities & Social Sciences">Humanities</option>
-                    </select>
-                  </div>
+                  <select
+                    value={profFacultyFilter}
+                    onChange={(e) => setProfFacultyFilter(e.target.value)}
+                    className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-blue-900 focus:outline-none"
+                  >
+                    <option value="all">All Faculties ({professors.length})</option>
+                    <option value="Faculty of Management">Faculty of Management</option>
+                    <option value="Faculty of Education">Faculty of Education</option>
+                    <option value="Faculty of Humanities & Social Sciences">Faculty of Humanities & Social Sciences</option>
+                  </select>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                {/* Responsive Table Preview of Active Professors & Faculty */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
+                    <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-                          <th className="py-3 px-4">Faculty Member</th>
-                          <th className="py-3 px-4">Title / Role</th>
-                          <th className="py-3 px-4">Department &amp; Faculty</th>
-                          <th className="py-3 px-4">Qualification &amp; Bio</th>
-                          <th className="py-3 px-4">Contact</th>
-                          <th className="py-3 px-4 text-right">Actions</th>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                          <th className="py-3.5 px-4">Faculty Member</th>
+                          <th className="py-3.5 px-4">Stream & Department</th>
+                          <th className="py-3.5 px-4">Academic Records & Bio</th>
+                          <th className="py-3.5 px-4">Subjects Taught</th>
+                          <th className="py-3.5 px-4 text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 text-xs">
                         {professors
                           .filter((p) => {
-                            const matchesFaculty =
-                              profFacultyFilter === "all" || p.faculty === profFacultyFilter;
                             const matchesSearch =
-                              !profSearchQuery ||
                               p.name.toLowerCase().includes(profSearchQuery.toLowerCase()) ||
                               p.title.toLowerCase().includes(profSearchQuery.toLowerCase()) ||
-                              p.department.toLowerCase().includes(profSearchQuery.toLowerCase());
-                            return matchesFaculty && matchesSearch;
+                              p.department.toLowerCase().includes(profSearchQuery.toLowerCase()) ||
+                              (p.subjects || []).some((s) => s.toLowerCase().includes(profSearchQuery.toLowerCase()));
+                            const matchesFaculty = profFacultyFilter === "all" || p.faculty === profFacultyFilter;
+                            return matchesSearch && matchesFaculty;
                           })
-                          .map((p) => (
-                            <tr
-                              key={p.id}
-                              className={`hover:bg-slate-50/80 transition-colors ${
-                                editingProfId === p.id ? "bg-amber-50/30" : ""
-                              }`}
-                            >
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-3">
-                                  <img
-                                    src={
-                                      p.imageUrl ||
-                                      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200"
-                                    }
-                                    alt={p.name}
-                                    className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
-                                  />
-                                  <div>
-                                    <span className="font-bold text-slate-900 block leading-tight">
-                                      {p.name}
-                                    </span>
-                                    <span className="text-[10px] text-emerald-600 font-mono font-bold">
-                                      Active Faculty
-                                    </span>
+                          .sort((a, b) => (a.order || 99) - (b.order || 99))
+                          .map((p) => {
+                            const isEditing = editingProfId === p.id;
+                            const isActive = !p.status || p.status === "active";
+
+                            return (
+                              <tr
+                                key={p.id}
+                                className={`transition-colors ${
+                                  isEditing
+                                    ? "bg-amber-50/40"
+                                    : "hover:bg-slate-50/80"
+                                }`}
+                              >
+                                <td className="py-3.5 px-4 align-top">
+                                  <div className="flex items-start gap-3">
+                                    <img
+                                      src={p.imageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200"}
+                                      alt={p.name}
+                                      className="w-11 h-11 rounded-xl object-cover border border-slate-200 shrink-0"
+                                    />
+                                    <div>
+                                      <div className="font-bold text-slate-900 text-sm">{p.name}</div>
+                                      <div className="text-purple-900 font-semibold text-[11px]">{p.title}</div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span
+                                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                                            isActive
+                                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                              : "bg-slate-100 text-slate-600"
+                                          }`}
+                                        >
+                                          {isActive ? "Active" : "Inactive"}
+                                        </span>
+                                        {p.email && (
+                                          <span className="text-[10px] text-slate-400 font-mono">{p.email}</span>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
-                                </div>
-                              </td>
+                                </td>
 
-                              <td className="py-3 px-4 font-semibold text-purple-950">
-                                {p.title}
-                              </td>
-
-                              <td className="py-3 px-4">
-                                <span className="font-medium text-slate-800 block">
-                                  {p.department}
-                                </span>
-                                <span className="text-[10px] text-slate-500">
-                                  {p.faculty}
-                                </span>
-                              </td>
-
-                              <td className="py-3 px-4 max-w-xs">
-                                <span className="font-mono text-[11px] text-slate-700 block font-semibold">
-                                  {p.qualification}
-                                </span>
-                                {p.bio ? (
-                                  <p className="text-[11px] text-slate-500 line-clamp-1 italic mt-0.5">
-                                    &ldquo;{p.bio}&rdquo;
-                                  </p>
-                                ) : (
-                                  p.researchInterests && (
-                                    <span className="text-[10px] text-slate-400 line-clamp-1">
-                                      Res: {p.researchInterests}
-                                    </span>
-                                  )
-                                )}
-                              </td>
-
-                              <td className="py-3 px-4 text-slate-500">
-                                <span className="block font-mono text-[10px] text-slate-600">
-                                  {p.email}
-                                </span>
-                                {p.phone && (
-                                  <span className="block font-mono text-[10px] text-slate-400">
-                                    {p.phone}
+                                <td className="py-3.5 px-4 align-top">
+                                  <span className="inline-block px-2 py-0.5 rounded-md bg-blue-50 text-blue-900 font-bold text-[10px] border border-blue-100 mb-1">
+                                    {p.faculty}
                                   </span>
-                                )}
-                              </td>
+                                  <div className="text-slate-700 font-medium text-xs">{p.department}</div>
+                                  {p.officeHours && (
+                                    <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      <span>{p.officeHours}</span>
+                                    </div>
+                                  )}
+                                </td>
 
-                              <td className="py-3 px-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => startEditProf(p)}
-                                    className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg transition cursor-pointer"
-                                    title="Edit Professor Record"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => requestDeleteProf(p)}
-                                    className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition cursor-pointer"
-                                    title="Delete Professor Record"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                                <td className="py-3.5 px-4 align-top max-w-xs">
+                                  <div className="font-semibold text-slate-800">{p.qualification}</div>
+                                  {p.researchInterests && (
+                                    <div className="text-[11px] text-slate-500 italic mt-0.5 line-clamp-1">
+                                      Research: {p.researchInterests}
+                                    </div>
+                                  )}
+                                  {p.bio && (
+                                    <div className="text-[11px] text-slate-600 mt-1 line-clamp-2">
+                                      {p.bio}
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td className="py-3.5 px-4 align-top max-w-xs">
+                                  <div className="flex flex-wrap gap-1">
+                                    {(p.subjects || []).map((sub, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-medium"
+                                      >
+                                        {sub}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+
+                                <td className="py-3.5 px-4 align-top text-right">
+                                  <div className="inline-flex items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditProf(p)}
+                                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                      title="Edit Faculty Record"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => requestDeleteProf(p)}
+                                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition cursor-pointer"
+                                      title="Delete Faculty Record"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
 
                   {professors.length === 0 && (
                     <div className="p-8 text-center text-slate-400 text-xs">
-                      No professors or faculty members found.
+                      No professors or academic faculty records found. Use the form above to add a faculty member.
                     </div>
                   )}
                 </div>
               </div>
             </div>
-          )}
-
-          {/* TAB: CAMPUS PORTAL SHORTCUTS MANAGER */}
-          {activeTab === "portal" && (
-            <CampusPortalManager
-              state={state}
-              onShowToast={showToast}
-              onRequestConfirmDelete={(options) =>
-                setConfirmModal({
-                  isOpen: true,
-                  confirmStyle: "danger",
-                  ...options,
-                })
-              }
-            />
-          )}
-
-          {/* TAB: UPCOMING EVENTS MANAGER */}
-          {activeTab === "upcoming-events" && (
-            <UpcomingEventsManager
-              state={state}
-              onShowToast={showToast}
-              onRequestConfirmDelete={(options) =>
-                setConfirmModal({
-                  isOpen: true,
-                  confirmStyle: "danger",
-                  ...options,
-                })
-              }
-            />
           )}
 
           {/* TAB 10: HELPDESK & EMERGENCY HOTLINE SETTINGS */}
@@ -3179,17 +3386,7 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
 
           {/* TAB 11: FAQS ACCORDION CRUD MANAGER */}
           {activeTab === "faqs" && (
-            <FaqManager
-              faqs={state?.faqs}
-              onShowToast={showToast}
-              onRequestConfirmDelete={(options) =>
-                setConfirmModal({
-                  isOpen: true,
-                  confirmStyle: "danger",
-                  ...options,
-                })
-              }
-            />
+            <FaqManager faqs={state?.faqs} onShowToast={showToast} />
           )}
 
           {/* TAB 12: COMPLAINT TRACKER SETTINGS */}
@@ -3197,88 +3394,13 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             <TrackingSettingsManager settings={state?.trackingSettings} onShowToast={showToast} />
           )}
 
-          {/* TAB 13: ADMIN PROFILE & AUTHENTICATION */}
+          {/* TAB 13: ADMIN ACCOUNTS & ROLE PERMISSIONS */}
           {activeTab === "admins" && (
-            <AccountInfoManager
-              currentUser={user}
-              onShowToast={showToast}
-            />
+            <AdminAccountsManager currentUser={user} onShowToast={showToast} />
           )}
 
         </div>
       </div>
-
-      {/* GLOBAL REUSABLE CONFIRMATION MODAL */}
-      {confirmModal.isOpen && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150"
-          onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
-        >
-          <div
-            className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden transform animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 shrink-0 shadow-xs">
-                    <Trash2 className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-serif font-bold text-lg text-slate-900 leading-snug">
-                      {confirmModal.title || "Confirm Deletion"}
-                    </h4>
-                    <span className="text-[11px] font-mono text-red-600 font-semibold uppercase tracking-wider">
-                      Permanent Action
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-                  aria-label="Close"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 leading-relaxed font-sans">
-                {confirmModal.message ||
-                  "Are you sure you want to permanently delete this item? This action cannot be undone."}
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const action = confirmModal.onConfirm;
-                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-                    if (action) {
-                      try {
-                        await action();
-                      } catch (err: any) {
-                        alert(err?.message || "Failed to complete deletion");
-                      }
-                    }
-                  }}
-                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-md shadow-red-600/30 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>{confirmModal.confirmLabel || "Delete Permanently"}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
