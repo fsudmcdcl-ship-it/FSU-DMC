@@ -10,6 +10,7 @@ import {
 } from "../lib/authService";
 import {
   getAllLocalContacts,
+  fetchServerMessages,
   saveSubItem,
   updateSubItem,
   deleteSubItem,
@@ -192,14 +193,19 @@ export default function MessagesViewer({ onGoHome, onGoCMS }: MessagesViewerProp
     return "Pending";
   };
 
-  // Load local + RTDB messages and keep them in sync
+  // Load local + server + RTDB messages and keep them in sync
   const loadAndSyncMessages = () => {
     // 1. Immediately hydrate from local storage + tracked complaints cache
     const localMerged = getAllLocalContacts();
     hydrateMessagesFromMap(localMerged);
     setLoading(false);
 
-    // 2. Subscribe to Firebase RTDB contacts node with error resilience
+    // 2. Fetch latest persisted messages from backend API (/api/messages)
+    fetchServerMessages().then((serverMerged) => {
+      hydrateMessagesFromMap(serverMerged);
+    });
+
+    // 3. Subscribe to Firebase RTDB contacts node with error resilience
     const contactsRef = ref(rtdb, "contacts");
     const unsubRtdb = onValue(
       contactsRef,
@@ -626,18 +632,18 @@ export default function MessagesViewer({ onGoHome, onGoCMS }: MessagesViewerProp
           <form onSubmit={handleCustomLogin} className="space-y-4 text-left">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Admin Username
+                Admin Email Address
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-                  <User className="w-4 h-4" />
+                  <Mail className="w-4 h-4" />
                 </span>
                 <input
-                  type="text"
+                  type="email"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter authorized admin username"
+                  placeholder="Enter authorized admin email"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
                 />
               </div>

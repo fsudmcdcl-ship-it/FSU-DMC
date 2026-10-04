@@ -16,6 +16,7 @@ import {
 import { DEFAULT_DB_STATE } from "./lib/defaults";
 import {
   loadInitialDbState,
+  fetchServerContentState,
   getLocalNodeData,
   setLocalNodeData,
   onLocalDataChanged,
@@ -56,10 +57,11 @@ import CampusStaffPage from "./pages/CampusStaffPage";
 import ProfessorsPage from "./pages/ProfessorsPage";
 import HelpdeskPage from "./pages/HelpdeskPage";
 import SecretariatPage from "./pages/SecretariatPage";
+import UpcomingEventPage from "./pages/UpcomingEventPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsPage from "./pages/TermsPage";
 import NotFoundPage from "./pages/NotFoundPage";
-import { CourseItem } from "./types";
+import { CourseItem, CampusPortalEntry, UpcomingEvent } from "./types";
 
 import { ArrowDown, Facebook, GraduationCap, ShieldCheck, ExternalLink, Search } from "lucide-react";
 
@@ -71,6 +73,7 @@ export type RouteType =
   | "syllabus-notes"
   | "fsu-team"
   | "student-blogs"
+  | "upcoming-event"
   | "contact"
   | "campuslogin"
   | "databasemessage2083"
@@ -125,6 +128,7 @@ export default function App() {
       if (pageParam === "syllabus-notes") return { route: "syllabus-notes" };
       if (pageParam === "fsu-team") return { route: "fsu-team" };
       if (pageParam === "student-blogs") return { route: "student-blogs" };
+      if (pageParam === "upcoming-event" || pageParam === "events") return { route: "upcoming-event" };
       if (pageParam === "contact") return { route: "contact" };
       if (pageParam === "privacy-policy") return { route: "privacy-policy" };
       if (pageParam === "terms-and-conditions") return { route: "terms-and-conditions" };
@@ -148,6 +152,8 @@ export default function App() {
       if (hash === "#syllabus-notes" || hash === "#/syllabus-notes") return { route: "syllabus-notes" };
       if (hash === "#fsu-team" || hash === "#/fsu-team") return { route: "fsu-team" };
       if (hash === "#student-blogs" || hash === "#/student-blogs") return { route: "student-blogs" };
+      if (hash === "#upcoming-event" || hash === "#/upcoming-event" || hash === "#events" || hash === "#/events")
+        return { route: "upcoming-event" };
       if (hash === "#contact" || hash === "#/contact") return { route: "contact" };
       if (hash === "#privacy-policy" || hash === "#/privacy-policy") return { route: "privacy-policy" };
       if (hash === "#terms-and-conditions" || hash === "#/terms-and-conditions") return { route: "terms-and-conditions" };
@@ -178,6 +184,7 @@ export default function App() {
     if (path.endsWith("/syllabus-notes")) return { route: "syllabus-notes" };
     if (path.endsWith("/fsu-team")) return { route: "fsu-team" };
     if (path.endsWith("/student-blogs")) return { route: "student-blogs" };
+    if (path.endsWith("/upcoming-event") || path.endsWith("/events")) return { route: "upcoming-event" };
     if (path.endsWith("/contact")) return { route: "contact" };
     if (path.endsWith("/privacy-policy")) return { route: "privacy-policy" };
     if (path.endsWith("/terms-and-conditions")) return { route: "terms-and-conditions" };
@@ -251,6 +258,13 @@ export default function App() {
   // Sync DB and Seed if empty
   useEffect(() => {
     const checkAndSeed = async () => {
+      const serverData = await fetchServerContentState();
+      if (serverData) {
+        setDbState((prev) => ({
+          ...prev,
+          ...serverData,
+        }));
+      }
       await seedInitialDataIfEmpty();
     };
     checkAndSeed();
@@ -276,6 +290,8 @@ export default function App() {
       "professors",
       "faqs",
       "trackingSettings",
+      "portalEntries",
+      "upcomingEvents",
       "contacts",
     ];
 
@@ -337,6 +353,14 @@ export default function App() {
   const team: TeamMember[] = dbState?.team ? Object.values(dbState.team) : [];
   const staff: StaffItem[] | undefined = dbState?.staff ? (Object.values(dbState.staff) as StaffItem[]) : undefined;
   const professors: ProfessorItem[] | undefined = dbState?.professors ? (Object.values(dbState.professors) as ProfessorItem[]) : undefined;
+  const upcomingEvents: UpcomingEvent[] = dbState?.upcomingEvents
+    ? (Object.values(dbState.upcomingEvents) as UpcomingEvent[])
+    : [];
+  const portalEntries: CampusPortalEntry[] = dbState?.portalEntries
+    ? (Object.values(dbState.portalEntries) as CampusPortalEntry[])
+        .filter((p) => p.isPublished !== false)
+        .sort((a, b) => (a.order || 99) - (b.order || 99))
+    : [];
   const importantNotice: ImportantNotice = dbState?.importantNotice || ({ active: false } as ImportantNotice);
 
   const president = team.find((m) => m.order === 1);
@@ -582,38 +606,64 @@ export default function App() {
                 </p>
               </div>
 
-              <div
-                onClick={() => navigateTo("campus-staff")}
-                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
-              >
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Directory</span>
-                  <h4 className="font-bold text-sm text-white mt-1">Campus Staff Directory</h4>
-                </div>
-                <span className="text-[11px] text-blue-200 mt-2">View 8 key administrative staff →</span>
-              </div>
+              {portalEntries.length > 0 ? (
+                portalEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    onClick={() => {
+                      if (entry.targetRoute.startsWith("http")) {
+                        window.location.href = entry.targetRoute;
+                      } else {
+                        navigateTo(entry.targetRoute.replace(/^\//, "") as RouteType);
+                      }
+                    }}
+                    className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                        {entry.badge}
+                      </span>
+                      <h4 className="font-bold text-sm text-white mt-1">{entry.title}</h4>
+                    </div>
+                    <span className="text-[11px] text-blue-200 mt-2">{entry.description}</span>
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div
+                    onClick={() => navigateTo("campus-staff")}
+                    className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Directory</span>
+                      <h4 className="font-bold text-sm text-white mt-1">Campus Staff Directory</h4>
+                    </div>
+                    <span className="text-[11px] text-blue-200 mt-2">View 8 key administrative staff →</span>
+                  </div>
 
-              <div
-                onClick={() => navigateTo("professors")}
-                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
-              >
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Faculty</span>
-                  <h4 className="font-bold text-sm text-white mt-1">Professors & Academic Directory</h4>
-                </div>
-                <span className="text-[11px] text-blue-200 mt-2">BBS, B.Ed, BA faculty members →</span>
-              </div>
+                  <div
+                    onClick={() => navigateTo("professors")}
+                    className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Faculty</span>
+                      <h4 className="font-bold text-sm text-white mt-1">Professors & Academic Directory</h4>
+                    </div>
+                    <span className="text-[11px] text-blue-200 mt-2">BBS, B.Ed, BA faculty members →</span>
+                  </div>
 
-              <div
-                onClick={() => navigateTo("fsu-helpdesk")}
-                className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
-              >
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Student Support</span>
-                  <h4 className="font-bold text-sm text-white mt-1">Unique FSU Helpdesk</h4>
-                </div>
-                <span className="text-[11px] text-blue-200 mt-2">FAQs & student ticket submission →</span>
-              </div>
+                  <div
+                    onClick={() => navigateTo("fsu-helpdesk")}
+                    className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Student Support</span>
+                      <h4 className="font-bold text-sm text-white mt-1">Unique FSU Helpdesk</h4>
+                    </div>
+                    <span className="text-[11px] text-blue-200 mt-2">FAQs & student ticket submission →</span>
+                  </div>
+                </>
+              )}
             </section>
 
             {/* SYLLABUS & NOTES PREVIEW */}
@@ -684,6 +734,12 @@ export default function App() {
             blogs={blogs}
             selectedBlogId={selectedBlogId}
             setSelectedBlogId={setSelectedBlogId}
+          />
+        )}
+        {currentRoute === "upcoming-event" && (
+          <UpcomingEventPage
+            events={upcomingEvents}
+            onNavigateHome={() => navigateTo("home")}
           />
         )}
         {currentRoute === "contact" && <ContactPage />}

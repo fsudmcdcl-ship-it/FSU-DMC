@@ -15,7 +15,9 @@ import {
 import ImageUploadInput from "./ImageUploadInput";
 import RichTextEditor from "./cms/RichTextEditor";
 import FaqManager from "./cms/FaqManager";
-import AdminAccountsManager from "./cms/AdminAccountsManager";
+import AccountInfoManager from "./cms/AccountInfoManager";
+import CampusPortalManager from "./cms/CampusPortalManager";
+import UpcomingEventsManager from "./cms/UpcomingEventsManager";
 import TrackingSettingsManager from "./cms/TrackingSettingsManager";
 import {
   DatabaseState,
@@ -72,7 +74,9 @@ import {
   Clock,
   BookOpen,
   Phone,
-  RefreshCw
+  RefreshCw,
+  Calendar,
+  LayoutGrid
 } from "lucide-react";
 
 interface CMSPanelProps {
@@ -93,6 +97,8 @@ type CMSTab =
   | "popup"
   | "staff"
   | "professors"
+  | "portal"
+  | "events"
   | "helpdesk"
   | "faqs"
   | "tracking"
@@ -330,8 +336,8 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
     setAuthSuccess("");
 
     try {
-      const successMsg = await resetPasswordAdmin(targetEmail);
-      setAuthSuccess(successMsg);
+      await resetPasswordAdmin(targetEmail);
+      setAuthSuccess(`Password reset instructions sent to ${targetEmail}.`);
       setShowForgotPassword(false);
     } catch (err: any) {
       console.error("Password reset error:", err);
@@ -911,69 +917,148 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             </div>
           )}
 
-          {/* Master / Secondary Admin Login Form */}
-          <form onSubmit={handleCredentialsLogin} className="w-full space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Admin Username
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                  <Users className="w-4 h-4" />
-                </span>
-                <input
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter administrator username"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Password
-                </label>
-                <span className="text-[10px] text-slate-400 font-mono">Case-sensitive</span>
-              </div>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
-                  <Lock className="w-4 h-4" />
-                </span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full py-3 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          {/* Firebase Admin Login Form */}
+          {showForgotPassword ? (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!resetEmail.trim()) {
+                  setAuthError("Please enter your registered administrator email address.");
+                  return;
+                }
+                setResetLoading(true);
+                setAuthError("");
+                setAuthSuccess("");
+                try {
+                  await resetPasswordAdmin(resetEmail.trim());
+                  setAuthSuccess("Password reset link sent! Please check your email inbox.");
+                } catch (err: any) {
+                  setAuthError(err.message || "Failed to send password reset email.");
+                } finally {
+                  setResetLoading(false);
+                }
+              }}
+              className="w-full space-y-4"
             >
-              {loginLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              )}
-              <span>Log In to CMS Panel</span>
-            </button>
-          </form>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Registered Admin Email
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="admin@fsudmc.com"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={resetLoading}
+                className="w-full py-3 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {resetLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <KeyRound className="w-4 h-4 text-amber-400" />
+                )}
+                <span>Send Password Reset Link</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setAuthError("");
+                  setAuthSuccess("");
+                }}
+                className="w-full py-2 text-xs font-bold text-blue-900 hover:underline cursor-pointer"
+              >
+                ← Back to Administrator Sign In
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleCredentialsLogin} className="w-full space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Admin Email Address
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter authorized admin email"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(username);
+                      setShowForgotPassword(true);
+                      setAuthError("");
+                      setAuthSuccess("");
+                    }}
+                    className="text-[11px] font-bold text-blue-900 hover:underline cursor-pointer"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                    <Lock className="w-4 h-4" />
+                  </span>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-900 focus:bg-white transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full py-3 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {loginLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                )}
+                <span>Sign In with Firebase Auth</span>
+              </button>
+            </form>
+          )}
 
           <div className="w-full space-y-3 mt-6">
             <button
@@ -1264,6 +1349,26 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
           >
             <GraduationCap className="w-4 h-4 text-purple-700" />
             <span>Professors & Faculty</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("events")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "events" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-amber-500" />
+            <span>Upcoming Campus Events</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("portal")}
+            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 ${
+              activeTab === "portal" ? "bg-blue-950 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4 text-indigo-600" />
+            <span>Campus Portal Shortcuts</span>
           </button>
 
           <button
@@ -3384,19 +3489,68 @@ export default function CMSPanel({ state, onGoHome, onGoMessages }: CMSPanelProp
             </div>
           )}
 
-          {/* TAB 11: FAQS ACCORDION CRUD MANAGER */}
-          {activeTab === "faqs" && (
-            <FaqManager faqs={state?.faqs} onShowToast={showToast} />
+          {/* TAB 11: UPCOMING CAMPUS EVENTS MANAGER */}
+          {activeTab === "events" && (
+            <UpcomingEventsManager
+              state={state}
+              onShowToast={showToast}
+              onRequestConfirmDelete={({ title, message, confirmLabel, onConfirm }) => {
+                setConfirmModal({
+                  isOpen: true,
+                  title,
+                  message,
+                  confirmLabel,
+                  confirmStyle: "danger",
+                  onConfirm,
+                });
+              }}
+            />
           )}
 
-          {/* TAB 12: COMPLAINT TRACKER SETTINGS */}
+          {/* TAB 12: CAMPUS PORTAL SHORTCUTS MANAGER */}
+          {activeTab === "portal" && (
+            <CampusPortalManager
+              state={state}
+              onShowToast={showToast}
+              onRequestConfirmDelete={({ title, message, confirmLabel, onConfirm }) => {
+                setConfirmModal({
+                  isOpen: true,
+                  title,
+                  message,
+                  confirmLabel,
+                  confirmStyle: "danger",
+                  onConfirm,
+                });
+              }}
+            />
+          )}
+
+          {/* TAB 13: FAQS ACCORDION CRUD MANAGER */}
+          {activeTab === "faqs" && (
+            <FaqManager
+              faqs={state?.faqs}
+              onShowToast={showToast}
+              onRequestConfirmDelete={({ title, message, confirmLabel, onConfirm }) => {
+                setConfirmModal({
+                  isOpen: true,
+                  title,
+                  message,
+                  confirmLabel,
+                  confirmStyle: "danger",
+                  onConfirm,
+                });
+              }}
+            />
+          )}
+
+          {/* TAB 14: COMPLAINT TRACKER SETTINGS */}
           {activeTab === "tracking" && (
             <TrackingSettingsManager settings={state?.trackingSettings} onShowToast={showToast} />
           )}
 
-          {/* TAB 13: ADMIN ACCOUNTS & ROLE PERMISSIONS */}
+          {/* TAB 15: ADMIN ACCOUNTS & ROLE PERMISSIONS */}
           {activeTab === "admins" && (
-            <AdminAccountsManager currentUser={user} onShowToast={showToast} />
+            <AccountInfoManager currentUser={user} onShowToast={showToast} />
           )}
 
         </div>

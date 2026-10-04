@@ -3,7 +3,7 @@ import { ref, get } from "firebase/database";
 import { rtdb } from "../lib/firebase";
 import { ContactSubmission, DatabaseState } from "../types";
 import { DEFAULT_DB_STATE } from "../lib/defaults";
-import { getTrackedComplaint } from "../lib/dataService";
+import { getTrackedComplaint, fetchTrackedComplaintFromServer } from "../lib/dataService";
 import {
   Search,
   ShieldCheck,
@@ -90,6 +90,11 @@ export default function ComplaintTracker({
       // If not in state, check local tracked cache
       if (!matched) {
         matched = getTrackedComplaint(rawCode);
+      }
+
+      // If still not found, query Backend API (/api/messages/track/:code)
+      if (!matched) {
+        matched = await fetchTrackedComplaintFromServer(rawCode);
       }
 
       // If still not found, query Firebase RTDB contacts node

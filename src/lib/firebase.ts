@@ -18,13 +18,14 @@ export const firebaseConfig = {
 };
 
 // Initialize Firebase App
-export const firebaseApp = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
+export const firebaseApp = app;
 
 // Initialize Realtime Database
-export const rtdb = getDatabase(firebaseApp);
+export const rtdb = getDatabase(app);
 
 // Initialize Firebase Authentication
-export const auth = getAuth(firebaseApp);
+export const auth = getAuth(app);
 
 // Initialize Firebase Analytics if supported
 export let analytics: ReturnType<typeof getAnalytics> | null = null;
@@ -32,7 +33,7 @@ if (typeof window !== "undefined") {
   isSupported()
     .then((supported) => {
       if (supported) {
-        analytics = getAnalytics(firebaseApp);
+        analytics = getAnalytics(app);
       }
     })
     .catch(() => {
